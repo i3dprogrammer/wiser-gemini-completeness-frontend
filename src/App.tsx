@@ -1434,7 +1434,7 @@ function RowActions({
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => {
+    const onDoc = (_e: MouseEvent) => {
       setOpen(false);
     };
     const onEsc = (e: KeyboardEvent) => {
