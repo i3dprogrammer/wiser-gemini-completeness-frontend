@@ -1,0 +1,30 @@
+export type Job = {
+  id: string; name: string; owner: string; status: string;
+  position: number; total_rows: number; processed_rows: number;
+  error_rows: number; created_at: string; started_at: string|null; finished_at: string|null;
+};
+export type Progress = { pending:number; processing:number; done:number; error:number; total:number };
+
+const json = async (res: Response) => {
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+};
+
+export const api = {
+  listJobs: (onlyMine:boolean, status?:string) =>
+    fetch(`/api/jobs?only_mine=${onlyMine}${status ? `&status=${status}`:''}`).then(json) as Promise<Job[]>,
+  jobProgress: (id:string) =>
+    fetch(`/api/job/${id}/rows/progress`).then(json) as Promise<Progress>,
+  upload: (fd: FormData) => fetch('/api/upload',{ method:'POST', body:fd }).then(json),
+  updateMapping: (jobId:string, mapping:Record<string,string>) =>
+    fetch(`/api/job/${jobId}/mapping`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(mapping)}).then(json),
+  reorder: (order:string[]) =>
+    fetch('/api/reorder',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(order)}).then(json),
+  pause: (id:string) => fetch(`/api/job/${id}/pause`, {method:'POST'}).then(json),
+  resume: (id:string) => fetch(`/api/job/${id}/resume`, {method:'POST'}).then(json),
+  export: (jobId:string) =>
+    fetch('/api/export',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({job_id: jobId})}).then(json),
+  exportStatus: (exportId:string) => fetch(`/api/export/${exportId}`).then(json),
+  exportDownloadUrl: (exportId:string) => `/api/export/${exportId}/download`,
+};
+
