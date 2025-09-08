@@ -1,21 +1,25 @@
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* smooth theme transitions */
-html { color-scheme: light dark; }
+html {
+  color-scheme: light dark;
+}
 :root {
   --card: 255 255 255;
   --card-foreground: 17 24 39;
   --bg: 248 250 252;
 }
-.dark :root {
+html.dark {
   --card: 2 6 23;
   --card-foreground: 226 232 240;
   --bg: 2 6 23;
 }
 body {
   background-color: rgb(var(--bg));
+  color: rgb(var(--card-foreground));
 }
 
 /* small UI primitives 
@@ -37,14 +41,31 @@ body {
 .table th { @apply text-left text-sm font-semibold text-slate-600 dark:text-slate-300 p-2; }
 .table td { @apply text-sm p-2 border-t border-slate-100 dark:border-slate-800; }*/
 
-
-.card { @apply rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm; }
-.btn { @apply inline-flex items-center gap-1 px-3 py-1.5 border rounded-md text-sm hover:bg-slate-50 dark:hover:bg-slate-800; }
-.btn-primary { @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700; }
-.input { @apply w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2; }
-.checkbox { @apply h-4 w-4 accent-blue-600; }
-.table th, .table td { @apply px-2 py-2 text-left border-b border-slate-200 dark:border-slate-800 align-middle; }
-.menu-item { @apply w-full px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center; }
+.card {
+  @apply rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm;
+}
+.btn {
+  @apply inline-flex items-center gap-1 px-3 py-1.5 border rounded-md text-sm hover:bg-slate-50 dark:hover:bg-slate-800;
+}
+.btn-primary {
+  @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
+}
+.input {
+  @apply w-full rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2;
+}
+.checkbox {
+  @apply h-4 w-4 accent-blue-600;
+}
+.table th,
+.table td {
+  @apply px-2 py-2 text-left border-b border-slate-200 dark:border-slate-800 align-middle;
+}
+.menu-item {
+  @apply w-full px-3 py-1.5 text-left flex items-center rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-inherit;
+}
+.menu-item:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
 
 .drawer {
   @apply fixed inset-0 bg-black/30 dark:bg-black/40 backdrop-blur-[2px] flex;
@@ -52,4 +73,3 @@ body {
 .drawer-panel {
   @apply ml-auto h-full w-full max-w-lg bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-4 overflow-y-auto;
 }
-

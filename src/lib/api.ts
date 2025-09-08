@@ -71,13 +71,7 @@ export const api = {
   },
 
   async export(jobId: string) {
-    return json<{ export_id: string; expires_at: string }>(
-      await fetch(`/api/export`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId }),
-      })
-    );
+    return json<{ export_id: string; expires_at: string }>(await fetch(`/api/export?job_id=${jobId}`));
   },
 
   async exportStatus(export_id: string) {
@@ -102,6 +96,13 @@ export const api = {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(mapping),
+      })
+    );
+  },
+  async updatePriority(jobId: string, priority: number) {
+    return json(
+      await fetch(`/api/job/${jobId}/priority?priority=${priority}`, {
+        method: "PATCH",
       })
     );
   },

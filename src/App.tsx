@@ -185,7 +185,7 @@ export default function App() {
         <div className="container flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" className="h-6 w-6" />
-            <div className="font-semibold">JSONB Tasks</div>
+            <div className="font-semibold">Gemini Based Completeness</div>
           </div>
 
           <div className="flex-1 flex justify-center">
@@ -339,8 +339,8 @@ function UploadCard({
   const [file, setFile] = useState<File | null>(null);
 
   // NEW: queue mode — 'top' or 'priority'
-  const [queueMode, setQueueMode] = useState<"top" | "priority">("top");
-  const [priority, setPriority] = useState<number>(3); // default mid
+  const [queueMode, setQueueMode] = useState<"top" | "priority">("priority");
+  const [priority, setPriority] = useState<number>(5);
 
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<ValidateSummary | null>(null);
@@ -459,6 +459,7 @@ function UploadCard({
       fd.set("file", file);
       fd.set("mapping", JSON.stringify(mapping));
       if (queueMode === "priority") fd.set("priority", String(priority)); // <-- backend should read this
+      if (queueMode === "top") fd.set("priority", String(1)); // if 'top', set to highest priority to push it up quickly
       const result = await api.upload(fd);
 
       // Save mapping history (merge)
@@ -478,8 +479,8 @@ function UploadCard({
       setFile(null);
       setSummary(null);
       setMapping({});
-      setQueueMode("top");
-      setPriority(3);
+      setQueueMode("priority");
+      setPriority(5);
     } catch (e: any) {
       throw e;
     } finally {
@@ -718,6 +719,9 @@ function QueueTable({
   }, [pageSize]);
   useEffect(() => setPage(1), [q, ownerFilter, statusFilter, prioFilter]);
 
+  const [prioOverrides, setPrioOverrides] = useState<Record<string, number>>({});
+  const getPrio = (j: Job) => (j.id in prioOverrides ? prioOverrides[j.id] : j.priority ?? 5);
+
   // sorting
   const [sortKey, setSortKey] = useState<SortKey>("manual");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -741,7 +745,7 @@ function QueueTable({
     return jobs.filter((j) => {
       const ownerOk = ownerFilter.length === 0 || ownerFilter.includes(j.owner);
       const statusOk = statusFilter.length === 0 || statusFilter.includes(j.status as StatusKey);
-      const prioOk = prioFilter.length === 0 || prioFilter.includes(j.priority ?? 3);
+      const prioOk = prioFilter.length === 0 || prioFilter.includes(getPrio(j));
       const qOk = !qn || [j.name, j.owner, j.status, String(j.priority ?? "")].some((v) => v?.toLowerCase().includes(qn));
       return ownerOk && statusOk && prioOk && qOk;
     });
@@ -786,8 +790,8 @@ function QueueTable({
           bv = b.status;
           break;
         case "priority":
-          av = a.priority ?? 99;
-          bv = b.priority ?? 99;
+          av = getPrio(a) ?? 99;
+          bv = getPrio(b) ?? 99;
           break;
         default:
           av = 0;
@@ -914,6 +918,7 @@ function QueueTable({
     });
     try {
       await onReorder(nextOrderIds);
+      await api.updatePriority(id, 1);
       pushToast({ type: "success", title: "Moved to top" });
     } catch (e: any) {
       pushToast({ type: "error", title: "Failed to move to top", detail: String(e?.message || e) });
@@ -1265,7 +1270,22 @@ function QueueTable({
                           </td>
 
                           <td className="align-top">
-                            <span className="px-2 py-0.5 rounded-full border text-xs">P{j.priority ?? 3}</span>
+                            <PriorityCell
+                              jobId={j.id}
+                              value={getPrio(j)}
+                              onChangeLocal={(next) => setPrioOverrides((m) => ({ ...m, [j.id]: next }))}
+                              onSaved={() => {
+                                // nothing required; polling will reconcile; leave override so UI stays correct
+                              }}
+                              onError={(err) => {
+                                // revert local override on failure
+                                setPrioOverrides((m) => {
+                                  const { [j.id]: _, ...rest } = m;
+                                  return rest;
+                                });
+                                pushToast({ type: "error", title: "Failed to update priority", detail: String(err?.message || err) });
+                              }}
+                            />
                           </td>
 
                           <td className="text-slate-500 truncate align-top">{j.owner}</td>
@@ -1418,6 +1438,7 @@ function RowActions({
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number; up: boolean }>({ x: 0, y: 0, up: false });
   const btnRef = React.useRef<HTMLButtonElement | null>(null);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
 
   // open menu as portal, fixed positioning to avoid clipping
   const openMenu = () => {
@@ -1434,7 +1455,11 @@ function RowActions({
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (_e: MouseEvent) => {
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      // only close if click is outside the menu AND the toggle button
+      if (menuRef.current?.contains(t)) return;
+      if (btnRef.current?.contains(t)) return;
       setOpen(false);
     };
     const onEsc = (e: KeyboardEvent) => {
@@ -1456,7 +1481,8 @@ function RowActions({
   const PortalMenu = open
     ? createPortal(
         <div
-          className="fixed z-[1000] w-48 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg"
+          ref={menuRef}
+          className="fixed z-[1000] w-48 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg text-slate-900 dark:text-slate-100"
           style={{ left: coords.x, top: coords.y }}
         >
           <ul className="py-1 text-sm">
@@ -1601,5 +1627,127 @@ function RowActions({
       </button>
       {PortalMenu}
     </div>
+  );
+}
+
+function PriorityCell({
+  jobId,
+  value,
+  onChangeLocal,
+  onSaved,
+  onError,
+}: {
+  jobId: string;
+  value: number;
+  onChangeLocal: (v: number) => void;
+  onSaved: () => void;
+  onError: (e: any) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+  const [saving, setSaving] = React.useState(false);
+  const btnRef = React.useRef<HTMLButtonElement | null>(null);
+  const menuRef = React.useRef<HTMLDivElement | null>(null);
+  const [coords, setCoords] = React.useState<{ x: number; y: number; up: boolean }>({ x: 0, y: 0, up: false });
+
+  React.useEffect(() => {
+    if (!open) setDraft(value);
+  }, [open, value]);
+
+  const openMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) {
+      setOpen((o) => !o);
+      return;
+    }
+    const spaceBelow = window.innerHeight - r.bottom;
+    const up = spaceBelow < 160;
+    setCoords({ x: r.left, y: up ? r.top - 8 : r.bottom + 8, up });
+    setOpen(true);
+  };
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t)) return;
+      if (btnRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onScroll = () => setOpen(false);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [open]);
+
+  const doSave = async () => {
+    try {
+      setSaving(true);
+      onChangeLocal(draft); // optimistic
+      await api.updatePriority(jobId, draft);
+      onSaved();
+      setOpen(false);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="px-2 py-0.5 rounded-full border text-xs hover:bg-slate-100 dark:hover:bg-slate-800"
+        onClick={openMenu}
+        title="Edit priority"
+      >
+        P{value}
+      </button>
+
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[1000] w-56 max-w-[92vw] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-2"
+            style={{ left: coords.x, top: coords.y }}
+          >
+            <div className="flex items-center gap-2">
+              <select className="input w-full" value={draft} onChange={(e) => setDraft(parseInt(e.target.value || "3", 10))} disabled={saving}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    P{n}
+                  </option>
+                ))}
+              </select>
+              <button
+                className={clsx(
+                  "px-2 py-1 rounded border text-xs",
+                  saving ? "opacity-50 cursor-not-allowed" : "bg-brand-600 text-white border-transparent hover:bg-brand-700"
+                )}
+                onClick={saving ? undefined : doSave}
+              >
+                OK
+              </button>
+              <button
+                className="px-2 py-1 rounded border text-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                onClick={() => setOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
