@@ -346,6 +346,10 @@ function UploadCard({
   const [summary, setSummary] = useState<ValidateSummary | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
 
+  const [dragDepth, setDragDepth] = useState(0);
+  const dragActive = dragDepth > 0;
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const nameTaken = useMemo(() => {
     const n = name.trim().toLowerCase();
     return !!n && existingNames.has(n);
@@ -455,11 +459,11 @@ function UploadCard({
       fd.set("name", name);
       fd.set("additional_prompt", prompt);
       fd.set("validate_images", String(validate));
-      fd.set("worker_concurrency", String(10)); // fixed
+      fd.set("worker_concurrency", String(25));
       fd.set("file", file);
       fd.set("mapping", JSON.stringify(mapping));
-      if (queueMode === "priority") fd.set("priority", String(priority)); // <-- backend should read this
-      if (queueMode === "top") fd.set("priority", String(1)); // if 'top', set to highest priority to push it up quickly
+      if (queueMode === "priority") fd.set("priority", String(priority));
+      if (queueMode === "top") fd.set("priority", String(1));
       const result = await api.upload(fd);
 
       // Save mapping history (merge)
@@ -527,8 +531,8 @@ function UploadCard({
 
         <div>
           <label className="block text-sm mb-1">Workers</label>
-          <input className="input w-28" value={10} readOnly />
-          <div className="text-xs text-slate-500 mt-1">Fixed to 10</div>
+          <input className="input w-28" value={25} readOnly />
+          <div className="text-xs text-slate-500 mt-1">Fixed to 25</div>
         </div>
 
         <div className="sm:col-span-3">
@@ -546,7 +550,75 @@ function UploadCard({
 
       <div className="mt-3">
         <label className="block text-sm mb-1">Input file (.jsonl / .json / .txt / .jsonb)</label>
-        <input className="input" type="file" accept=".jsonl,.json,.txt,.jsonb" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => fileInputRef.current?.click()}
+          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInputRef.current?.click()}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragDepth((d) => d + 1);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragDepth((d) => Math.max(0, d - 1));
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragDepth(0);
+            const f = e.dataTransfer?.files?.[0];
+            if (!f) return;
+            // optional: simple extension guard
+            const okExt = /\.(jsonl|json|txt|jsonb)$/i.test(f.name);
+            if (!okExt) {
+              alert("Please drop a .jsonl, .json, .txt, or .jsonb file.");
+              return;
+            }
+            setFile(f);
+          }}
+          onPaste={(e) => {
+            const f = e.clipboardData.files?.[0];
+            if (f) setFile(f);
+          }}
+          className={clsx(
+            "rounded-lg border-2 border-dashed p-4 text-center cursor-pointer select-none",
+            "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700",
+            dragActive && "border-brand-600 bg-brand-50/60 dark:bg-brand-950/30"
+          )}
+          title="Drop a file here or click to browse"
+        >
+          {file ? (
+            <div className="space-y-1">
+              <div className="font-medium">{file.name}</div>
+              <div className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB — click to change, or drop another file</div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="font-medium">Drop a file here</div>
+              <div className="text-xs text-slate-500">…or click to choose from your device</div>
+            </div>
+          )}
+        </div>
+
+        {/* Hidden real input for click-browse fallback */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".jsonl,.json,.txt,.jsonb,application/json,text/plain"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) setFile(f);
+          }}
+        />
       </div>
 
       {/* Stats */}
@@ -1224,11 +1296,12 @@ function QueueTable({
               <tbody>
                 {paged.map((j) => {
                   const p = progressMap[j.id];
-                  const pct = p?.total
-                    ? Math.floor((p.done / p.total) * 100)
-                    : j.total_rows
-                    ? Math.floor((j.processed_rows / j.total_rows) * 100)
-                    : 0;
+                  const total = (p?.total ?? j.total_rows) || 0;
+                  const processed = (p?.done ?? j.processed_rows) || 0;
+                  const errors = (p?.error ?? j.error_rows) || 0;
+                  const doneInclErrors = processed + errors;
+                  const pct = total ? Math.min(100, Math.floor((doneInclErrors / total) * 100)) : 0;
+
                   const hue = rowHue(j.status as StatusKey);
                   const isSelected = selected.has(j.id);
                   const displayName = j.name.length > 60 ? j.name.slice(0, 57) + "…" : j.name;
@@ -1300,7 +1373,17 @@ function QueueTable({
                                 <div className="h-full bg-emerald-600" style={{ width: `${pct}%` }} />
                               </div>
                               <div className="text-xs text-slate-500 mt-1">
-                                {p ? `${p.done}/${p.total}` : `${j.processed_rows}/${j.total_rows}`} ({pct}%)
+                                {`${doneInclErrors}/${total}`} ({pct}%)
+                                {errors > 0 && (
+                                  <span className="ml-1">
+                                    <span className="opacity-70">[</span>
+                                    <span className="font-semibold">
+                                      {errors} error{errors !== 1 ? "s" : ""}
+                                    </span>
+                                    <span className="opacity-70">]</span>
+                                  </span>
+                                )}
+                                {j.matches_found ? <span className="font-semibold">, {j.matches_found} matches found</span> : ""}
                               </div>
                             </div>
                           </td>
@@ -1554,7 +1637,7 @@ function RowActions({
             <li>
               <button
                 disabled={job.status !== "running"}
-                className="menu-item text-amber-700 disabled:opacity-50"
+                className="menu-item !text-amber-700 dark:!text-amber-400 disabled:opacity-50"
                 onClick={() => {
                   setOpen(false);
                   onCancel();
@@ -1567,7 +1650,7 @@ function RowActions({
             <li>
               <button
                 disabled={job.status === "running" || job.status === "pausing"}
-                className="menu-item text-rose-600 disabled:opacity-50"
+                className="menu-item !text-rose-600 dark:!text-rose-400 disabled:opacity-50"
                 onClick={() => {
                   setOpen(false);
                   onDelete();

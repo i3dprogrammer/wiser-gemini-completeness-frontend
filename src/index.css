@@ -19,7 +19,7 @@ html.dark {
 }
 body {
   background-color: rgb(var(--bg));
-  color: rgb(var(--card-foreground));
+  /* color: rgb(var(--card-foreground)); */
 }
 
 /* small UI primitives 
@@ -62,6 +62,7 @@ body {
 }
 .menu-item {
   @apply w-full px-3 py-1.5 text-left flex items-center rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 text-inherit;
+  color: inherit;
 }
 .menu-item:disabled {
   @apply opacity-50 cursor-not-allowed;

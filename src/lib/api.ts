@@ -14,6 +14,7 @@ export type Job = {
   created_at?: string;
   started_at?: string | null;
   finished_at?: string | null;
+  matches_found?: number;
 };
 
 export type Progress = {
