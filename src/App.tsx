@@ -1,15 +1,33 @@
 // src/App.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./lib/api";
-import type { Job, Progress } from "./lib/api";
-import { Pause, Play, FileDown, XCircle, Trash2, ChevronsUp, MoreVertical, Check, X, Info, RotateCcw, ArrowUpDown } from "lucide-react";
-import ThemeToggle from "./components/ThemeToggle";
-import clsx from "clsx";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from './lib/api';
+import type { Job, Progress } from './lib/api';
+import {
+  Pause,
+  Play,
+  FileDown,
+  XCircle,
+  Trash2,
+  ChevronsUp,
+  MoreVertical,
+  Check,
+  X,
+  Info,
+  RotateCcw,
+  ArrowUpDown,
+} from 'lucide-react';
+import ThemeToggle from './components/ThemeToggle';
+import clsx from 'clsx';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 /* ----------------------------- Helpers/Types ----------------------------- */
 
@@ -21,42 +39,66 @@ type ValidateSummary = {
   invalidSamples: string[];
   uniqueRefKeys: string[];
 };
-type InsertWhere = { mode: "top" } | { mode: "priority"; priority: number };
-const STATUS_LIST = ["queued", "running", "pausing", "paused", "completed", "failed", "canceled"] as const;
+type InsertWhere = { mode: 'top' } | { mode: 'priority'; priority: number };
+const STATUS_LIST = [
+  'queued',
+  'running',
+  'pausing',
+  'paused',
+  'completed',
+  'failed',
+  'canceled',
+] as const;
 type StatusKey = (typeof STATUS_LIST)[number];
 
-const LS_OWNERS = "ownerFilter";
-const LS_STATUSES = "statusFilter";
-const LS_PRIOS = "prioFilter";
-const LS_MAP_HISTORY = "mapping_history_v1";
-const LS_PAGE_SIZE = "jobsPageSize";
+const LS_OWNERS = 'ownerFilter';
+const LS_STATUSES = 'statusFilter';
+const LS_PRIOS = 'prioFilter';
+const LS_MAP_HISTORY = 'mapping_history_v1';
+const LS_PAGE_SIZE = 'jobsPageSize';
 
-type SortKey = "manual" | "name" | "created_at" | "status" | "priority";
-type SortDir = "asc" | "desc";
+type SortKey = 'manual' | 'name' | 'created_at' | 'status' | 'priority';
+type SortDir = 'asc' | 'desc';
 
 /* ---------------------------- Toasts (simple) ---------------------------- */
 
-type Toast = { id: string; type: "success" | "error" | "info"; title: string; detail?: string };
-const Toasts: React.FC<{ toasts: Toast[]; onDismiss: (id: string) => void }> = ({ toasts, onDismiss }) => (
+type Toast = { id: string; type: 'success' | 'error' | 'info'; title: string; detail?: string };
+const Toasts: React.FC<{ toasts: Toast[]; onDismiss: (id: string) => void }> = ({
+  toasts,
+  onDismiss,
+}) => (
   <div className="fixed top-3 right-3 z-50 space-y-2">
     {toasts.map((t) => (
       <div
         key={t.id}
         className={clsx(
-          "min-w-[260px] max-w-[420px] rounded-lg border shadow-soft px-3 py-2 text-sm",
-          t.type === "success" &&
-            "bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-100",
-          t.type === "error" && "bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-100",
-          t.type === "info" && "bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-100"
+          'min-w-[260px] max-w-[420px] rounded-lg border shadow-soft px-3 py-2 text-sm',
+          t.type === 'success' &&
+            'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-100',
+          t.type === 'error' &&
+            'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-100',
+          t.type === 'info' &&
+            'bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-100'
         )}
       >
         <div className="flex items-start gap-2">
-          <div className="mt-0.5">{t.type === "success" ? <Check size={16} /> : t.type === "error" ? <X size={16} /> : <Info size={16} />}</div>
+          <div className="mt-0.5">
+            {t.type === 'success' ? (
+              <Check size={16} />
+            ) : t.type === 'error' ? (
+              <X size={16} />
+            ) : (
+              <Info size={16} />
+            )}
+          </div>
           <div className="flex-1">
             <div className="font-medium">{t.title}</div>
             {!!t.detail && <div className="text-xs opacity-80 whitespace-pre-wrap">{t.detail}</div>}
           </div>
-          <button className="text-xs underline opacity-70 hover:opacity-100" onClick={() => onDismiss(t.id)}>
+          <button
+            className="text-xs underline opacity-70 hover:opacity-100"
+            onClick={() => onDismiss(t.id)}
+          >
             Dismiss
           </button>
         </div>
@@ -71,7 +113,7 @@ function ConfirmModal({
   open,
   title,
   body,
-  requireText = "confirm",
+  requireText = 'confirm',
   onClose,
   onConfirm,
 }: {
@@ -82,9 +124,9 @@ function ConfirmModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const [val, setVal] = React.useState("");
+  const [val, setVal] = React.useState('');
   React.useEffect(() => {
-    if (open) setVal("");
+    if (open) setVal('');
   }, [open]);
   if (!open) return null;
   const ok = val.trim().toLowerCase() === requireText.toLowerCase();
@@ -93,19 +135,35 @@ function ConfirmModal({
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative z-10 w-[min(92vw,520px)] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xl">
         <div className="text-lg font-semibold mb-1">{title}</div>
-        {!!body && <div className="text-sm text-slate-600 dark:text-slate-300 mb-3 whitespace-pre-wrap">{body}</div>}
+        {!!body && (
+          <div className="text-sm text-slate-600 dark:text-slate-300 mb-3 whitespace-pre-wrap">
+            {body}
+          </div>
+        )}
         <div className="text-xs mb-2 text-slate-500">
-          Type{" "}
-          <span className="font-mono px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">confirm</span>{" "}
+          Type{' '}
+          <span className="font-mono px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            confirm
+          </span>{' '}
           to continue
         </div>
-        <input className="input w-full mb-4" value={val} onChange={(e) => setVal(e.target.value)} autoFocus />
+        <input
+          className="input w-full mb-4"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          autoFocus
+        />
         <div className="flex justify-end gap-2">
           <button className="btn" onClick={onClose}>
             Cancel
           </button>
           <button
-            className={clsx("btn", ok ? "bg-brand-600 text-white border-transparent hover:bg-brand-700" : "opacity-50 cursor-not-allowed")}
+            className={clsx(
+              'btn',
+              ok
+                ? 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
+                : 'opacity-50 cursor-not-allowed'
+            )}
             onClick={ok ? onConfirm : undefined}
           >
             Confirm
@@ -120,8 +178,8 @@ function ConfirmModal({
 
 function useJobs() {
   return useQuery({
-    queryKey: ["jobs"],
-    queryFn: () => api.listJobs(false, ""),
+    queryKey: ['jobs'],
+    queryFn: () => api.listJobs(false, ''),
     refetchInterval: 5000,
   });
 }
@@ -137,13 +195,13 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<StatusKey[]>([]);
   const [prioFilter, setPrioFilter] = useState<number[]>([]);
   // Free search (not persisted)
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState('');
 
   useEffect(() => {
     try {
-      const o = JSON.parse(localStorage.getItem(LS_OWNERS) || "[]");
-      const s = JSON.parse(localStorage.getItem(LS_STATUSES) || "[]");
-      const p = JSON.parse(localStorage.getItem(LS_PRIOS) || "[]");
+      const o = JSON.parse(localStorage.getItem(LS_OWNERS) || '[]');
+      const s = JSON.parse(localStorage.getItem(LS_STATUSES) || '[]');
+      const p = JSON.parse(localStorage.getItem(LS_PRIOS) || '[]');
       setOwnerFilter(Array.isArray(o) ? o : []);
       setStatusFilter(Array.isArray(s) ? s : []);
       setPrioFilter(Array.isArray(p) ? p : []);
@@ -167,7 +225,7 @@ export default function App() {
 
   // Toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const pushToast = (t: Omit<Toast, "id">) => {
+  const pushToast = (t: Omit<Toast, 'id'>) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const toast: Toast = { id, ...t };
     setToasts((prev) => [...prev, toast]);
@@ -204,13 +262,16 @@ export default function App() {
 
       <div className="container py-6 space-y-6">
         <UploadCard
-          existingNames={useMemo(() => new Set(jobs.map((j) => j.name.trim().toLowerCase())), [jobs])}
+          existingNames={useMemo(
+            () => new Set(jobs.map((j) => j.name.trim().toLowerCase())),
+            [jobs]
+          )}
           onUploaded={async ({ job_id, insertWhere }) => {
-            pushToast({ type: "success", title: "Task created" });
-            await qc.invalidateQueries({ queryKey: ["jobs"] });
+            pushToast({ type: 'success', title: 'Task created' });
+            await qc.invalidateQueries({ queryKey: ['jobs'] });
             if (insertWhere && job_id) {
-              if (insertWhere.mode === "top") {
-                const all = (await qc.getQueryData<Job[]>(["jobs"])) || [];
+              if (insertWhere.mode === 'top') {
+                const all = (await qc.getQueryData<Job[]>(['jobs'])) || [];
                 const currentOrder = all.map((j) => j.id);
                 const idx = currentOrder.indexOf(job_id);
                 if (idx !== -1) {
@@ -219,11 +280,15 @@ export default function App() {
                   nextOrder.unshift(job_id);
                   try {
                     await api.reorder(nextOrder);
-                    pushToast({ type: "success", title: "Moved to top" });
+                    pushToast({ type: 'success', title: 'Moved to top' });
                   } catch (e: any) {
-                    pushToast({ type: "error", title: "Failed to move to top", detail: String(e?.message || e) });
+                    pushToast({
+                      type: 'error',
+                      title: 'Failed to move to top',
+                      detail: String(e?.message || e),
+                    });
                   }
-                  await qc.invalidateQueries({ queryKey: ["jobs"] });
+                  await qc.invalidateQueries({ queryKey: ['jobs'] });
                 }
               }
               // if mode is 'priority', backend should pick it up from upload payload
@@ -247,73 +312,85 @@ export default function App() {
           onReorder={async (ids) => {
             try {
               await api.reorder(ids);
-              pushToast({ type: "success", title: "Order saved" });
+              pushToast({ type: 'success', title: 'Order saved' });
             } catch (e: any) {
-              pushToast({ type: "error", title: "Failed to save order", detail: String(e?.message || e) });
+              pushToast({
+                type: 'error',
+                title: 'Failed to save order',
+                detail: String(e?.message || e),
+              });
             }
           }}
           onPause={async (id) => {
             try {
               await api.pause(id);
-              pushToast({ type: "success", title: "Paused" });
+              pushToast({ type: 'success', title: 'Paused' });
             } catch (e: any) {
-              pushToast({ type: "error", title: "Pause failed", detail: String(e?.message || e) });
+              pushToast({ type: 'error', title: 'Pause failed', detail: String(e?.message || e) });
             }
           }}
           onResume={async (id) => {
             try {
               await api.resume(id);
-              pushToast({ type: "success", title: "Resumed" });
+              pushToast({ type: 'success', title: 'Resumed' });
             } catch (e: any) {
-              pushToast({ type: "error", title: "Resume failed", detail: String(e?.message || e) });
+              pushToast({ type: 'error', title: 'Resume failed', detail: String(e?.message || e) });
             }
           }}
           onExport={async (id) => {
             try {
               const { export_id } = await api.export(id);
-              pushToast({ type: "info", title: "Export started" });
+              pushToast({ type: 'info', title: 'Export started' });
               const timer = setInterval(async () => {
                 try {
                   const st = await api.exportStatus(export_id);
-                  if (st.status === "ready") {
+                  if (st.status === 'ready') {
                     clearInterval(timer);
-                    pushToast({ type: "success", title: "Export ready" });
+                    pushToast({ type: 'success', title: 'Export ready' });
                     window.location.href = api.exportDownloadUrl(export_id);
-                  } else if (st.status === "failed" || st.status === "expired") {
+                  } else if (st.status === 'failed' || st.status === 'expired') {
                     clearInterval(timer);
-                    pushToast({ type: "error", title: `Export ${st.status}` });
+                    pushToast({ type: 'error', title: `Export ${st.status}` });
                   }
                 } catch (e: any) {
                   clearInterval(timer);
-                  pushToast({ type: "error", title: "Export failed", detail: String(e?.message || e) });
+                  pushToast({
+                    type: 'error',
+                    title: 'Export failed',
+                    detail: String(e?.message || e),
+                  });
                 }
               }, 3000);
             } catch (e: any) {
-              pushToast({ type: "error", title: "Export failed to start", detail: String(e?.message || e) });
+              pushToast({
+                type: 'error',
+                title: 'Export failed to start',
+                detail: String(e?.message || e),
+              });
             }
           }}
           onCancel={async (id) => {
             try {
               await api.cancel(id);
-              pushToast({ type: "success", title: "Canceled" });
+              pushToast({ type: 'success', title: 'Canceled' });
             } catch (e: any) {
-              pushToast({ type: "error", title: "Cancel failed", detail: String(e?.message || e) });
+              pushToast({ type: 'error', title: 'Cancel failed', detail: String(e?.message || e) });
             }
           }}
           onDelete={async (id) => {
             try {
               await api.delete(id);
-              pushToast({ type: "success", title: "Deleted" });
+              pushToast({ type: 'success', title: 'Deleted' });
             } catch (e: any) {
-              pushToast({ type: "error", title: "Delete failed", detail: String(e?.message || e) });
+              pushToast({ type: 'error', title: 'Delete failed', detail: String(e?.message || e) });
             }
           }}
           onReset={async (id) => {
             try {
               await api.reset(id);
-              pushToast({ type: "success", title: "Job reset" });
+              pushToast({ type: 'success', title: 'Job reset' });
             } catch (e: any) {
-              pushToast({ type: "error", title: "Reset failed", detail: String(e?.message || e) });
+              pushToast({ type: 'error', title: 'Reset failed', detail: String(e?.message || e) });
             }
           }}
         />
@@ -324,6 +401,8 @@ export default function App() {
 
 /* ------------------------------- UploadCard ------------------------------ */
 
+// --- REPLACE JUST THE UploadCard COMPONENT BELOW IN YOUR FILE ---
+
 function UploadCard({
   onUploaded,
   existingNames,
@@ -331,36 +410,34 @@ function UploadCard({
 }: {
   onUploaded: (r: { job_id?: string; insertWhere?: InsertWhere }) => void;
   existingNames: Set<string>;
-  pushToast: (t: Omit<Toast, "id">) => void;
+  pushToast: (t: Omit<Toast, 'id'>) => void;
 }) {
-  const [name, setName] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [validate, setValidate] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  type FileEntry = {
+    id: string;
+    file: File;
+    taskName: string; // editable per-file
+    summary: ValidateSummary | null; // filled after parse
+  };
+
+  const [files, setFiles] = React.useState<FileEntry[]>([]);
 
   // NEW: queue mode — 'top' or 'priority'
-  const [queueMode, setQueueMode] = useState<"top" | "priority">("priority");
+  const [queueMode, setQueueMode] = useState<'top' | 'priority'>('priority');
   const [priority, setPriority] = useState<number>(5);
 
+  const [prompt, setPrompt] = useState('');
+  const [validate, setValidate] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [summary, setSummary] = useState<ValidateSummary | null>(null);
-  const [mapping, setMapping] = useState<Record<string, string>>({});
 
+  // Mapping (union of keys across all files) + history
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragDepth, setDragDepth] = useState(0);
   const dragActive = dragDepth > 0;
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const nameTaken = useMemo(() => {
-    const n = name.trim().toLowerCase();
-    return !!n && existingNames.has(n);
-  }, [name, existingNames]);
-
-  const canUpload = !!name && !nameTaken && !!file && !!summary && summary.valid > 0 && summary.invalid === 0 && !busy;
-
-  // mapping history helpers
   const loadHistory = (): Record<string, string> => {
     try {
-      return JSON.parse(localStorage.getItem(LS_MAP_HISTORY) || "{}");
+      return JSON.parse(localStorage.getItem(LS_MAP_HISTORY) || '{}');
     } catch {
       return {};
     }
@@ -371,154 +448,223 @@ function UploadCard({
     } catch {}
   };
 
-  // Validate file + build mapping preview
-  useEffect(() => {
-    if (!file) {
-      setSummary(null);
-      setMapping({});
-      return;
-    }
-
-    (async () => {
-      try {
-        const text = await file.text();
-        const lines: any[] = [];
-        let parsed: any = null;
-        const nonEmpty = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-        let jsonlOk = true;
-        for (const l of nonEmpty) {
-          try {
-            parsed = JSON.parse(l);
-          } catch {
-            jsonlOk = false;
-            break;
-          }
-          lines.push(parsed);
-        }
-        if (!jsonlOk) {
-          const obj = JSON.parse(text);
-          if (Array.isArray(obj)) lines.push(...obj);
-          else lines.push(obj);
-        }
-
-        let valid = 0,
-          invalid = 0;
-        const invalidSamples: string[] = [];
-        const keySet = new Set<string>();
-        for (const o of lines) {
-          const ref = o?.referenceProduct?.referenceAttributes;
-          const tgt = o?.targetMerchant?.targetName || o?.targetMerchant?.targetHomepage;
-          const hasKeys = ref && typeof ref === "object" && Object.keys(ref).length > 0;
-          const hasTarget = typeof tgt === "string" && tgt.trim().length > 0;
-          if (hasKeys && hasTarget) {
-            valid++;
-            Object.keys(ref).forEach((k) => keySet.add(k));
-          } else {
-            invalid++;
-            if (invalidSamples.length < 5) {
-              const reason = !hasKeys ? "Missing referenceAttributes keys" : "Missing targetName/homepage";
-              invalidSamples.push(reason);
-            }
-          }
-        }
-
-        const sum: ValidateSummary = {
-          sizeBytes: file.size,
-          total: lines.length,
-          valid,
-          invalid,
-          invalidSamples,
-          uniqueRefKeys: Array.from(keySet).sort(),
-        };
-        setSummary(sum);
-
-        const history = loadHistory();
-        const map: Record<string, string> = {};
-        sum.uniqueRefKeys.forEach((k) => (map[k] = typeof history[k] === "string" && history[k] ? history[k] : k));
-        setMapping(map);
-      } catch {
-        setSummary({
-          sizeBytes: file.size,
-          total: 0,
-          valid: 0,
-          invalid: 1,
-          invalidSamples: ["File parse error"],
-          uniqueRefKeys: [],
-        });
-        setMapping({});
-      }
-    })();
-  }, [file]);
-
-  // Upload handler
-  const doUpload = async () => {
-    if (!file || !summary) return;
-    setBusy(true);
+  // Helper: parse a single file -> ValidateSummary
+  const parseOne = async (f: File): Promise<ValidateSummary> => {
     try {
-      const fd = new FormData();
-      fd.set("name", name);
-      fd.set("additional_prompt", prompt);
-      fd.set("validate_images", String(validate));
-      fd.set("worker_concurrency", String(25));
-      fd.set("file", file);
-      fd.set("mapping", JSON.stringify(mapping));
-      if (queueMode === "priority") fd.set("priority", String(priority));
-      if (queueMode === "top") fd.set("priority", String(1));
-      const result = await api.upload(fd);
+      const text = await f.text();
+      const lines: any[] = [];
+      let parsed: any = null;
+      const nonEmpty = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      let jsonlOk = true;
+      for (const l of nonEmpty) {
+        try {
+          parsed = JSON.parse(l);
+        } catch {
+          jsonlOk = false;
+          break;
+        }
+        lines.push(parsed);
+      }
+      if (!jsonlOk) {
+        const obj = JSON.parse(text);
+        if (Array.isArray(obj)) lines.push(...obj);
+        else lines.push(obj);
+      }
 
-      // Save mapping history (merge)
-      const hist = loadHistory();
-      const merged = { ...hist, ...mapping };
-      saveHistory(merged);
+      let valid = 0,
+        invalid = 0;
+      const invalidSamples: string[] = [];
+      const keySet = new Set<string>();
+      for (const o of lines) {
+        const ref = o?.referenceProduct?.referenceAttributes;
+        const tgt = o?.targetMerchant?.targetName || o?.targetMerchant?.targetHomepage;
+        const hasKeys = ref && typeof ref === 'object' && Object.keys(ref).length > 0;
+        const hasTarget = typeof tgt === 'string' && tgt.trim().length > 0;
+        if (hasKeys && hasTarget) {
+          valid++;
+          Object.keys(ref).forEach((k) => keySet.add(k));
+        } else {
+          invalid++;
+          if (invalidSamples.length < 5) {
+            const reason = !hasKeys
+              ? 'Missing referenceAttributes keys'
+              : 'Missing targetName/homepage';
+            invalidSamples.push(reason);
+          }
+        }
+      }
 
-      onUploaded({
-        job_id: result?.job_id,
-        insertWhere: queueMode === "top" ? { mode: "top" } : { mode: "priority", priority },
+      return {
+        sizeBytes: f.size,
+        total: lines.length,
+        valid,
+        invalid,
+        invalidSamples,
+        uniqueRefKeys: Array.from(keySet).sort(),
+      };
+    } catch {
+      return {
+        sizeBytes: f.size,
+        total: 0,
+        valid: 0,
+        invalid: 1,
+        invalidSamples: ['File parse error'],
+        uniqueRefKeys: [],
+      };
+    }
+  };
+
+  // Add files (from input, drop, or paste). Dedup by name+size+lastModified to avoid obvious dupes.
+  const addFiles = (list: FileList | File[]) => {
+    const arr = Array.from(list);
+    if (!arr.length) return;
+    const ok = arr.filter((f) => /\.(jsonl|json|txt|jsonb|ndjson)$/i.test(f.name));
+    const dedupeKey = (f: File) => `${f.name}__${f.size}__${(f as any).lastModified || 0}`;
+    const existingKeys = new Set(files.map((e) => dedupeKey(e.file)));
+    const toAdd = ok.filter((f) => !existingKeys.has(dedupeKey(f)));
+    if (toAdd.length === 0) return;
+
+    // seed entries with filename as default taskName (trim extension)
+    const entries: FileEntry[] = toAdd.map((f) => ({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      file: f,
+      taskName: f.name.replace(/\.[^.]+$/, ''),
+      summary: null,
+    }));
+
+    setFiles((prev) => [...prev, ...entries]);
+
+    // parse newly added files
+    (async () => {
+      const parsedEntries = await Promise.all(
+        entries.map(async (e) => ({ ...e, summary: await parseOne(e.file) }))
+      );
+      setFiles((prev) => {
+        const byId = new Map(prev.map((p) => [p.id, p] as const));
+        parsedEntries.forEach((u) => byId.set(u.id, u));
+        const next = Array.from(byId.values());
+        return next;
       });
 
-      // reset
-      setName("");
-      setPrompt("");
+      // rebuild union mapping keys from all files, honoring history defaults
+      const union = new Set<string>();
+      parsedEntries.forEach((e) => e.summary?.uniqueRefKeys.forEach((k) => union.add(k)));
+      files.forEach((e) => e.summary?.uniqueRefKeys.forEach((k) => union.add(k)));
+      const hist = loadHistory();
+      const nextMap: Record<string, string> = {};
+      Array.from(union)
+        .sort()
+        .forEach((k) => (nextMap[k] = typeof hist[k] === 'string' && hist[k] ? hist[k] : k));
+      setMapping(nextMap);
+    })();
+  };
+
+  const removeFile = (id: string) => setFiles((prev) => prev.filter((e) => e.id !== id));
+
+  const updateTaskName = (id: string, name: string) =>
+    setFiles((prev) => prev.map((e) => (e.id === id ? { ...e, taskName: name } : e)));
+
+  // Validation gates
+  const anyNameTaken = React.useMemo(() => {
+    return files.some((e) => {
+      const n = e.taskName.trim().toLowerCase();
+      return !!n && existingNames.has(n);
+    });
+  }, [files, existingNames]);
+
+  const allSummarized = files.length > 0 && files.every((e) => e.summary !== null);
+  const allValid =
+    allSummarized &&
+    files.every((e) => {
+      const s = e.summary!;
+      return s.valid > 0 && s.invalid === 0;
+    });
+
+  const canUpload = files.length > 0 && allValid && !anyNameTaken && !busy;
+
+  // Upload sequentially (one job per file)
+  const doUploadAll = async () => {
+    if (!canUpload) return;
+    setBusy(true);
+    try {
+      const hist = loadHistory();
+      const mergedHistory = { ...hist, ...mapping };
+      saveHistory(mergedHistory);
+
+      for (const entry of files) {
+        const fd = new FormData();
+        const name = entry.taskName.trim() || entry.file.name.replace(/\.[^.]+$/, '');
+        fd.set('name', name);
+        fd.set('additional_prompt', prompt);
+        fd.set('validate_images', String(validate));
+        fd.set('worker_concurrency', String(50));
+        fd.set('file', entry.file);
+        fd.set('mapping', JSON.stringify(mapping));
+        if (queueMode === 'priority') fd.set('priority', String(priority));
+        if (queueMode === 'top') fd.set('priority', String(1));
+
+        try {
+          const result = await api.upload(fd);
+          onUploaded({
+            job_id: result?.job_id,
+            insertWhere: queueMode === 'top' ? { mode: 'top' } : { mode: 'priority', priority },
+          });
+          pushToast({ type: 'success', title: `Created: ${name}` });
+        } catch (e: any) {
+          pushToast({
+            type: 'error',
+            title: `Upload failed: ${name}`,
+            detail: String(e?.message || e),
+          });
+        }
+      }
+
+      // reset after attempting all
+      setFiles([]);
+      setPrompt('');
       setValidate(false);
-      setFile(null);
-      setSummary(null);
       setMapping({});
-      setQueueMode("priority");
+      setQueueMode('priority');
       setPriority(5);
-    } catch (e: any) {
-      throw e;
     } finally {
       setBusy(false);
     }
   };
 
+  const onMappingBlur = (k: string, v: string) => {
+    const hist = loadHistory();
+    hist[k] = v || k;
+    saveHistory(hist);
+  };
+
+  // UI helpers
+  const totalBytes = files.reduce((a, e) => a + (e.summary?.sizeBytes || e.file.size || 0), 0);
+
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Create Task</h2>
+        <h2 className="text-lg font-semibold">Create Tasks</h2>
       </div>
 
-      {/* Name + Queue placement + Workers */}
-      <div className="grid gap-3 mt-3 sm:grid-cols-[1fr_auto_auto]">
-        <div>
-          <label className="block text-sm mb-1">Task name</label>
-          <input
-            className={clsx("input", nameTaken && "border-rose-400 focus:ring-rose-300")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          {nameTaken && <div className="text-xs text-rose-600 mt-1">A task with this name already exists.</div>}
-        </div>
-
+      {/* Queue placement + Workers */}
+      <div className="grid gap-3 mt-3 sm:grid-cols-[auto_auto_1fr]">
         <div>
           <label className="block text-sm mb-1">Queue Placement</label>
           <div className="flex items-center gap-2">
-            <select className="input w-44" value={queueMode} onChange={(e) => setQueueMode(e.target.value as any)}>
+            <select
+              className="input w-44"
+              value={queueMode}
+              onChange={(e) => setQueueMode(e.target.value as any)}
+            >
               <option value="top">Top of Queue</option>
               <option value="priority">Priority</option>
             </select>
-            {queueMode === "priority" && (
-              <select className="input w-24" value={priority} onChange={(e) => setPriority(parseInt(e.target.value || "3", 10))}>
+            {queueMode === 'priority' && (
+              <select
+                className="input w-24"
+                value={priority}
+                onChange={(e) => setPriority(parseInt(e.target.value || '5', 10))}
+              >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
                     P{n}
@@ -531,31 +677,43 @@ function UploadCard({
 
         <div>
           <label className="block text-sm mb-1">Workers</label>
-          <input className="input w-28" value={25} readOnly />
-          <div className="text-xs text-slate-500 mt-1">Fixed to 25</div>
+          <input className="input w-28" value={50} readOnly />
+          <div className="text-xs text-slate-500 mt-1">Fixed to 50</div>
         </div>
+      </div>
 
-        <div className="sm:col-span-3">
-          <label className="block text-sm mb-1">Additional prompt (optional)</label>
-          <textarea className="input h-24" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-        </div>
+      <div className="mt-3">
+        <label className="block text-sm mb-1">Additional prompt (optional)</label>
+        <textarea
+          className="input h-24"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
       </div>
 
       <div className="mt-3">
         <label className="inline-flex items-center gap-2">
-          <input type="checkbox" className="checkbox" checked={validate} onChange={(e) => setValidate(e.target.checked)} />
+          <input
+            type="checkbox"
+            className="checkbox"
+            checked={validate}
+            onChange={(e) => setValidate(e.target.checked)}
+          />
           <span>Validate Images</span>
         </label>
       </div>
 
+      {/* File drop/select */}
       <div className="mt-3">
-        <label className="block text-sm mb-1">Input file (.jsonl / .json / .txt / .jsonb)</label>
+        <label className="block text-sm mb-1">
+          Input files (.jsonl / .json / .txt / .jsonb / .ndjson)
+        </label>
 
         <div
           role="button"
           tabIndex={0}
           onClick={() => fileInputRef.current?.click()}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInputRef.current?.click()}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileInputRef.current?.click()}
           onDragEnter={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -574,72 +732,131 @@ function UploadCard({
             e.preventDefault();
             e.stopPropagation();
             setDragDepth(0);
-            const f = e.dataTransfer?.files?.[0];
-            if (!f) return;
-            // optional: simple extension guard
-            const okExt = /\.(jsonl|json|txt|jsonb)$/i.test(f.name);
-            if (!okExt) {
-              alert("Please drop a .jsonl, .json, .txt, or .jsonb file.");
-              return;
-            }
-            setFile(f);
+            const dt = e.dataTransfer;
+            if (!dt?.files?.length) return;
+            addFiles(dt.files);
           }}
           onPaste={(e) => {
-            const f = e.clipboardData.files?.[0];
-            if (f) setFile(f);
+            const list = e.clipboardData.files;
+            if (list && list.length) addFiles(list);
           }}
           className={clsx(
-            "rounded-lg border-2 border-dashed p-4 text-center cursor-pointer select-none",
-            "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700",
-            dragActive && "border-brand-600 bg-brand-50/60 dark:bg-brand-950/30"
+            'rounded-lg border-2 border-dashed p-4 text-center cursor-pointer select-none',
+            'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700',
+            dragActive && 'border-brand-600 bg-brand-50/60 dark:bg-brand-950/30'
           )}
-          title="Drop a file here or click to browse"
+          title="Drop files here or click to browse"
         >
-          {file ? (
+          {files.length ? (
             <div className="space-y-1">
-              <div className="font-medium">{file.name}</div>
-              <div className="text-xs text-slate-500">{(file.size / 1024).toFixed(1)} KB — click to change, or drop another file</div>
+              <div className="font-medium">{files.length} file(s) selected</div>
+              <div className="text-xs text-slate-500">
+                {(totalBytes / 1024).toFixed(1)} KB — click to add more, or drop more files
+              </div>
             </div>
           ) : (
             <div className="space-y-1">
-              <div className="font-medium">Drop a file here</div>
+              <div className="font-medium">Drop files here</div>
               <div className="text-xs text-slate-500">…or click to choose from your device</div>
             </div>
           )}
         </div>
 
-        {/* Hidden real input for click-browse fallback */}
+        {/* Hidden real input for click-browse */}
         <input
           ref={fileInputRef}
           type="file"
-          accept=".jsonl,.json,.txt,.jsonb,application/json,text/plain"
+          multiple
+          accept=".jsonl,.json,.txt,.ndjson,.jsonb,application/json,text/plain"
           className="hidden"
           onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) setFile(f);
+            const list = e.target.files;
+            if (list && list.length) addFiles(list);
+            // reset value to allow re-selecting the same files later
+            if (fileInputRef.current) fileInputRef.current.value = '';
           }}
         />
       </div>
 
-      {/* Stats */}
-      {summary && (
-        <div className="mt-3 text-sm">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <Stat label="File size" value={`${(summary.sizeBytes / 1024).toFixed(1)} KB`} />
-            <Stat label="Total rows" value={summary.total} />
-            <Stat label="Valid" value={summary.valid} className="text-emerald-600 dark:text-emerald-400" />
-            <Stat label="Invalid" value={summary.invalid} className="text-rose-600 dark:text-rose-400" />
+      {/* Files table with per-file stats + editable job name */}
+      {files.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-md font-semibold mb-2">Selected Files</h3>
+          <div className="border rounded-lg overflow-x-auto">
+            <table className="w-full table min-w-[860px]">
+              <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+                <tr>
+                  <th className="w-[28ch]">Job name</th>
+                  <th className="w-[28ch]">Filename</th>
+                  <th className="w-28">Size</th>
+                  <th className="w-24">Rows</th>
+                  <th className="w-24 text-emerald-700 dark:text-emerald-400">Valid</th>
+                  <th className="w-24 text-rose-600 dark:text-rose-400">Invalid</th>
+                  <th>Notes</th>
+                  <th className="w-16">Remove</th>
+                </tr>
+              </thead>
+              <tbody>
+                {files.map((e) => {
+                  const s = e.summary;
+                  const nameTaken = (() => {
+                    const n = e.taskName.trim().toLowerCase();
+                    return !!n && existingNames.has(n);
+                  })();
+                  return (
+                    <tr key={e.id}>
+                      <td className="align-top">
+                        <input
+                          className={clsx(
+                            'input w-full',
+                            nameTaken && 'border-rose-400 focus:ring-rose-300'
+                          )}
+                          value={e.taskName}
+                          onChange={(ev) => updateTaskName(e.id, ev.target.value)}
+                          placeholder="Job name"
+                          title={nameTaken ? 'A task with this name already exists.' : ''}
+                        />
+                        {nameTaken && (
+                          <div className="text-xs text-rose-600 mt-1">Name already exists.</div>
+                        )}
+                      </td>
+                      <td className="text-slate-500 align-top break-words">{e.file.name}</td>
+                      <td className="text-slate-500 align-top">
+                        {((s?.sizeBytes ?? e.file.size) / 1024).toFixed(1)} KB
+                      </td>
+                      <td className="align-top">{s ? s.total : '…'}</td>
+                      <td className="align-top">{s ? s.valid : '…'}</td>
+                      <td className="align-top">{s ? s.invalid : '…'}</td>
+                      <td className="text-xs text-slate-500 align-top">
+                        {s && s.invalid > 0 && s.invalidSamples?.length
+                          ? `Ex: ${s.invalidSamples.join(', ')}`
+                          : ''}
+                      </td>
+                      <td className="align-top">
+                        <button
+                          className="px-2 py-1 rounded border text-xs bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                          onClick={() => removeFile(e.id)}
+                          aria-label={`Remove ${e.file.name}`}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          {!!summary.invalidSamples.length && (
-            <div className="text-xs text-rose-600 dark:text-rose-400 mt-1">Examples: {summary.invalidSamples.join(", ")}</div>
-          )}
+          <div className="text-xs text-slate-500 mt-1">
+            You can edit job names per file. Duplicate names will be flagged.
+          </div>
         </div>
       )}
 
-      {/* Mapping preview */}
+      {/* Mapping preview (union) */}
       {!!Object.keys(mapping).length && (
         <div className="mt-4">
-          <h3 className="text-md font-semibold mb-2">Reference Key Mapping (preview)</h3>
+          <h3 className="text-md font-semibold mb-2">Reference Key Mapping (all files)</h3>
           <div className="border rounded-lg">
             <div className="overflow-x-auto">
               <div className="max-h=[60vh] md:max-h-[420px] overflow-y-auto">
@@ -658,20 +875,10 @@ function UploadCard({
                           <input
                             className="input w-full"
                             value={v}
-                            onChange={(e) => setMapping((m) => ({ ...m, [k]: e.target.value || k }))}
-                            onBlur={(e) => {
-                              const hist = (() => {
-                                try {
-                                  return JSON.parse(localStorage.getItem(LS_MAP_HISTORY) || "{}");
-                                } catch {
-                                  return {};
-                                }
-                              })();
-                              hist[k] = e.target.value || k;
-                              try {
-                                localStorage.setItem(LS_MAP_HISTORY, JSON.stringify(hist));
-                              } catch {}
-                            }}
+                            onChange={(e) =>
+                              setMapping((m) => ({ ...m, [k]: e.target.value || k }))
+                            }
+                            onBlur={(e) => onMappingBlur(k, e.target.value)}
                           />
                         </td>
                       </tr>
@@ -681,37 +888,56 @@ function UploadCard({
               </div>
             </div>
           </div>
-          <div className="text-xs text-slate-500 mt-1">Header is sticky; scroll to see all keys.</div>
+          <div className="text-xs text-slate-500 mt-1">
+            Header is sticky; scroll to see all keys.
+          </div>
         </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 flex items-center gap-2">
         <button
           disabled={!canUpload}
-          className={clsx("btn", canUpload ? "bg-brand-600 hover:bg-brand-700 text-white border-transparent" : "opacity-50 cursor-not-allowed")}
+          className={clsx(
+            'btn',
+            canUpload
+              ? 'bg-brand-600 hover:bg-brand-700 text-white border-transparent'
+              : 'opacity-50 cursor-not-allowed'
+          )}
           onClick={async () => {
             try {
-              await doUpload();
+              await doUploadAll();
             } catch (e: any) {
-              pushToast({ type: "error", title: "Upload failed", detail: String(e?.message || e) });
+              pushToast({ type: 'error', title: 'Upload failed', detail: String(e?.message || e) });
             }
           }}
         >
-          Upload & Create Task
+          Upload {files.length ? `(${files.length})` : ''} & Create Task(s)
         </button>
+        {files.length > 0 && (
+          <button
+            className="btn"
+            onClick={() => setFiles([])}
+            disabled={busy}
+            title="Clear selected files"
+          >
+            Clear files
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function Stat({ label, value, className }: { label: string; value: any; className?: string }) {
-  return (
-    <div className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={clsx("text-sm font-semibold", className)}>{value}</div>
-    </div>
-  );
-}
+// --- No changes required below this line in your file. Keep Stat() as-is. ---
+
+// function Stat({ label, value, className }: { label: string; value: any; className?: string }) {
+//   return (
+//     <div className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60">
+//       <div className="text-xs text-slate-500">{label}</div>
+//       <div className={clsx('text-sm font-semibold', className)}>{value}</div>
+//     </div>
+//   );
+// }
 
 /* ----------------------------- Draggable Row ----------------------------- */
 
@@ -726,7 +952,10 @@ function DraggableRow({
   dndEnabled: boolean;
   children: (dragListeners: any) => React.ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id, disabled: !dndEnabled });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+    id,
+    disabled: !dndEnabled,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition };
   return (
     <tr ref={setNodeRef} style={style} {...(dndEnabled ? attributes : {})} className={hueClass}>
@@ -774,7 +1003,7 @@ function QueueTable({
   onCancel: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReset: (id: string) => Promise<void>;
-  pushToast: (t: Omit<Toast, "id">) => void;
+  pushToast: (t: Omit<Toast, 'id'>) => void;
 }) {
   // pagination (persist page size)
   const initialPageSize = (() => {
@@ -792,22 +1021,22 @@ function QueueTable({
   useEffect(() => setPage(1), [q, ownerFilter, statusFilter, prioFilter]);
 
   const [prioOverrides, setPrioOverrides] = useState<Record<string, number>>({});
-  const getPrio = (j: Job) => (j.id in prioOverrides ? prioOverrides[j.id] : j.priority ?? 5);
+  const getPrio = (j: Job) => (j.id in prioOverrides ? prioOverrides[j.id] : (j.priority ?? 5));
 
   // sorting
-  const [sortKey, setSortKey] = useState<SortKey>("manual");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey, setSortKey] = useState<SortKey>('manual');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const toggleSort = (key: SortKey) => {
-    if (key === "manual") {
-      setSortKey("manual");
+    if (key === 'manual') {
+      setSortKey('manual');
       return;
     }
     if (sortKey !== key) {
       setSortKey(key);
-      setSortDir("asc");
-    } else setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+      setSortDir('asc');
+    } else setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
   };
-  const isManual = sortKey === "manual";
+  const isManual = sortKey === 'manual';
 
   const ownerOptions = useMemo(() => Array.from(new Set(jobs.map((j) => j.owner))).sort(), [jobs]);
 
@@ -818,7 +1047,11 @@ function QueueTable({
       const ownerOk = ownerFilter.length === 0 || ownerFilter.includes(j.owner);
       const statusOk = statusFilter.length === 0 || statusFilter.includes(j.status as StatusKey);
       const prioOk = prioFilter.length === 0 || prioFilter.includes(getPrio(j));
-      const qOk = !qn || [j.name, j.owner, j.status, String(j.priority ?? "")].some((v) => v?.toLowerCase().includes(qn));
+      const qOk =
+        !qn ||
+        [j.name, j.owner, j.status, String(j.priority ?? '')].some((v) =>
+          v?.toLowerCase().includes(qn)
+        );
       return ownerOk && statusOk && prioOk && qOk;
     });
   }, [jobs, ownerFilter, statusFilter, prioFilter, q]);
@@ -849,19 +1082,19 @@ function QueueTable({
     const cmp = (a: Job, b: Job) => {
       let av: any, bv: any;
       switch (sortKey) {
-        case "name":
+        case 'name':
           av = a.name;
           bv = b.name;
           break;
-        case "created_at":
-          av = a.created_at || "";
-          bv = b.created_at || "";
+        case 'created_at':
+          av = a.created_at || '';
+          bv = b.created_at || '';
           break;
-        case "status":
+        case 'status':
           av = a.status;
           bv = b.status;
           break;
-        case "priority":
+        case 'priority':
           av = getPrio(a) ?? 99;
           bv = getPrio(b) ?? 99;
           break;
@@ -869,8 +1102,8 @@ function QueueTable({
           av = 0;
           bv = 0;
       }
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
       // tie-breaker by original order
       return jobs.findIndex((j) => j.id === a.id) - jobs.findIndex((j) => j.id === b.id);
     };
@@ -892,7 +1125,9 @@ function QueueTable({
     let cursor = 0;
     const BATCH = 25;
     const tick = async () => {
-      const idsAll = baseRows.filter((r) => ["running", "pausing"].includes(r.status)).map((r) => r.id);
+      const idsAll = baseRows
+        .filter((r) => ['running', 'pausing'].includes(r.status))
+        .map((r) => r.id);
       if (!idsAll.length) {
         if (!stop) setProgressMap({});
         return;
@@ -915,7 +1150,7 @@ function QueueTable({
           for (const [id, p] of entries) if (p) next[id] = p;
           for (const k of Object.keys(next)) {
             const row = baseRows.find((r) => r.id === k);
-            if (!row || !["running", "pausing"].includes(row.status)) delete next[k];
+            if (!row || !['running', 'pausing'].includes(row.status)) delete next[k];
           }
           return next;
         });
@@ -941,7 +1176,7 @@ function QueueTable({
     if (a === -1 || b === -1) return;
     const next = arrayMove(rows, a, b);
     setRows(next);
-    setDirty(next.map((j) => j.id).join("|") !== lastServerOrderRef.current.join("|"));
+    setDirty(next.map((j) => j.id).join('|') !== lastServerOrderRef.current.join('|'));
   };
 
   // selection (now global across all filtered rows)
@@ -953,29 +1188,37 @@ function QueueTable({
   const allFilteredIds = filteredAll.map((r) => r.id);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
   const toggleAllFiltered = (checked: boolean) => setSelectedIds(checked ? allFilteredIds : []);
-  const toggleOne = (id: string) => setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleOne = (id: string) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   // bulk actions (pause/resume/cancel/delete). Delete includes confirm.
-  const doBulk = async (kind: "pause" | "resume" | "cancel" | "delete") => {
+  const doBulk = async (kind: 'pause' | 'resume' | 'cancel' | 'delete') => {
     const can = (j: Job) => {
-      if (kind === "pause") return ["running", "queued"].includes(j.status);
-      if (kind === "resume") return ["paused", "pausing"].includes(j.status);
-      if (kind === "cancel") return j.status === "running";
-      if (kind === "delete") return j.status !== "running" && j.status !== "pausing";
+      if (kind === 'pause') return ['running', 'queued'].includes(j.status);
+      if (kind === 'resume') return ['paused', 'pausing'].includes(j.status);
+      if (kind === 'cancel') return j.status === 'running';
+      if (kind === 'delete') return j.status !== 'running' && j.status !== 'pausing';
       return false;
     };
     const targets = filteredAll.filter((r) => selected.has(r.id) && can(r)).map((r) => r.id);
     if (!targets.length) return;
     try {
-      if (kind === "pause") await Promise.all(targets.map(onPause));
-      else if (kind === "resume") await Promise.all(targets.map(onResume));
-      else if (kind === "cancel") await Promise.all(targets.map(onCancel));
+      if (kind === 'pause') await Promise.all(targets.map(onPause));
+      else if (kind === 'resume') await Promise.all(targets.map(onResume));
+      else if (kind === 'cancel') await Promise.all(targets.map(onCancel));
       else await Promise.all(targets.map(onDelete));
-      const label = kind === "pause" ? "Paused" : kind === "resume" ? "Resumed" : kind === "cancel" ? "Canceled" : "Deleted";
-      pushToast({ type: "success", title: `${label} ${targets.length} job(s)` });
-      if (kind === "delete") setSelectedIds([]); // clear selection after delete
+      const label =
+        kind === 'pause'
+          ? 'Paused'
+          : kind === 'resume'
+            ? 'Resumed'
+            : kind === 'cancel'
+              ? 'Canceled'
+              : 'Deleted';
+      pushToast({ type: 'success', title: `${label} ${targets.length} job(s)` });
+      if (kind === 'delete') setSelectedIds([]); // clear selection after delete
     } catch (e: any) {
-      pushToast({ type: "error", title: "Bulk action failed", detail: String(e?.message || e) });
+      pushToast({ type: 'error', title: 'Bulk action failed', detail: String(e?.message || e) });
     }
   };
 
@@ -991,9 +1234,9 @@ function QueueTable({
     try {
       await onReorder(nextOrderIds);
       await api.updatePriority(id, 1);
-      pushToast({ type: "success", title: "Moved to top" });
+      pushToast({ type: 'success', title: 'Moved to top' });
     } catch (e: any) {
-      pushToast({ type: "error", title: "Failed to move to top", detail: String(e?.message || e) });
+      pushToast({ type: 'error', title: 'Failed to move to top', detail: String(e?.message || e) });
     }
     setDirty(false);
     lastServerOrderRef.current = nextOrderIds;
@@ -1023,30 +1266,31 @@ function QueueTable({
       lastServerOrderRef.current = order;
     }
   };
-  const orderChanged = isManual && rows.map((j) => j.id).join("|") !== lastServerOrderRef.current.join("|");
+  const orderChanged =
+    isManual && rows.map((j) => j.id).join('|') !== lastServerOrderRef.current.join('|');
 
   // row coloring
   const rowHue = (s: StatusKey) => {
     switch (s) {
-      case "failed":
-        return "bg-rose-50 dark:bg-rose-950/30";
-      case "canceled":
-        return "bg-orange-50 dark:bg-orange-950/30";
-      case "completed":
-        return "bg-slate-50 dark:bg-slate-900/40";
-      case "running":
-      case "queued":
-      case "pausing":
-      case "paused":
-        return "bg-emerald-50/50 dark:bg-emerald-950/30";
+      case 'failed':
+        return 'bg-rose-50 dark:bg-rose-950/30';
+      case 'canceled':
+        return 'bg-orange-50 dark:bg-orange-950/30';
+      case 'completed':
+        return 'bg-slate-50 dark:bg-slate-900/40';
+      case 'running':
+      case 'queued':
+      case 'pausing':
+      case 'paused':
+        return 'bg-emerald-50/50 dark:bg-emerald-950/30';
       default:
-        return "";
+        return '';
     }
   };
   const formatLocal = (iso?: string | null) => {
-    if (!iso) return "–";
+    if (!iso) return '–';
     const d = new Date(iso);
-    const pad = (n: number) => (n < 10 ? "0" : "") + n;
+    const pad = (n: number) => (n < 10 ? '0' : '') + n;
     const dd = pad(d.getDate());
     const mm = pad(d.getMonth() + 1);
     const yyyy = d.getFullYear();
@@ -1056,7 +1300,7 @@ function QueueTable({
   };
 
   // pagination buttons model: 1 … cur cur+1 cur+2 … last
-  const pageButtons = React.useMemo<(number | "dots")[]>(() => {
+  const pageButtons = React.useMemo<(number | 'dots')[]>(() => {
     const total = Math.max(1, Math.ceil(baseRows.length / pageSize));
     const cur = Math.min(safePage, total);
     const set = new Set<number>();
@@ -1068,19 +1312,24 @@ function QueueTable({
     const nums = Array.from(set)
       .filter((n) => n >= 1 && n <= total)
       .sort((a, b) => a - b);
-    const out: (number | "dots")[] = [];
+    const out: (number | 'dots')[] = [];
     for (let i = 0; i < nums.length; i++) {
-      if (i > 0 && nums[i] - nums[i - 1] > 1) out.push("dots");
+      if (i > 0 && nums[i] - nums[i - 1] > 1) out.push('dots');
       out.push(nums[i]);
     }
     return out;
   }, [baseRows.length, safePage, pageSize]);
 
   // confirm modal (for bulk delete)
-  const [confirm, setConfirm] = React.useState<{ open: boolean; title: string; body: string; onConfirm: () => void }>({
+  const [confirm, setConfirm] = React.useState<{
+    open: boolean;
+    title: string;
+    body: string;
+    onConfirm: () => void;
+  }>({
     open: false,
-    title: "",
-    body: "",
+    title: '',
+    body: '',
     onConfirm: () => {},
   });
   const askConfirm = (title: string, body: string, action: () => Promise<void>) => {
@@ -1098,27 +1347,44 @@ function QueueTable({
     });
   };
 
-  const Chip = ({ checked, label, onChange }: { checked: boolean; label: string; onChange: (v: boolean) => void }) => (
+  const Chip = ({
+    checked,
+    label,
+    onChange,
+  }: {
+    checked: boolean;
+    label: string;
+    onChange: (v: boolean) => void;
+  }) => (
     <label
       className={clsx(
-        "px-2 py-1 rounded border text-sm cursor-pointer",
-        checked ? "bg-brand-600 text-white border-transparent" : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+        'px-2 py-1 rounded border text-sm cursor-pointer',
+        checked
+          ? 'bg-brand-600 text-white border-transparent'
+          : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'
       )}
     >
-      <input type="checkbox" className="hidden" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input
+        type="checkbox"
+        className="hidden"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
       {label}
     </label>
   );
 
   const headerSortBtn = (label: string, key: SortKey, extra?: string) => (
     <button
-      className={clsx("inline-flex items-center gap-1", extra)}
+      className={clsx('inline-flex items-center gap-1', extra)}
       onClick={() => toggleSort(key)}
-      title={key === "manual" ? "Manual order" : `Sort by ${label}`}
+      title={key === 'manual' ? 'Manual order' : `Sort by ${label}`}
     >
       <span>{label}</span>
-      {key !== "manual" && <ArrowUpDown size={14} className={clsx(sortKey === key ? "opacity-100" : "opacity-40")} />}
-      {sortKey === key && <span className="text-xs">{sortDir === "asc" ? "↑" : "↓"}</span>}
+      {key !== 'manual' && (
+        <ArrowUpDown size={14} className={clsx(sortKey === key ? 'opacity-100' : 'opacity-40')} />
+      )}
+      {sortKey === key && <span className="text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>}
     </button>
   );
 
@@ -1137,12 +1403,14 @@ function QueueTable({
             onChange={(e) => setQ(e.target.value)}
           />
           {q && (
-            <button className="text-sm underline text-slate-500" onClick={() => setQ("")}>
+            <button className="text-sm underline text-slate-500" onClick={() => setQ('')}>
               Clear
             </button>
           )}
         </div>
-        <span className="text-sm text-slate-500 shrink-0">{isFetching ? "Refreshing…" : "Up to date"}</span>
+        <span className="text-sm text-slate-500 shrink-0">
+          {isFetching ? 'Refreshing…' : 'Up to date'}
+        </span>
       </div>
 
       {/* Row 2: Owners + Statuses + Priority */}
@@ -1155,7 +1423,11 @@ function QueueTable({
                 key={o}
                 checked={ownerFilter.includes(o)}
                 label={o}
-                onChange={(on) => setOwnerFilter((prev: string[]) => (on ? [...prev, o] : prev.filter((x: string) => x !== o)))}
+                onChange={(on) =>
+                  setOwnerFilter((prev: string[]) =>
+                    on ? [...prev, o] : prev.filter((x: string) => x !== o)
+                  )
+                }
               />
             ))}
             <button className="text-xs underline text-slate-500" onClick={() => setOwnerFilter([])}>
@@ -1172,10 +1444,17 @@ function QueueTable({
                 key={s}
                 checked={statusFilter.includes(s)}
                 label={s}
-                onChange={(on) => setStatusFilter((prev: StatusKey[]) => (on ? [...prev, s] : prev.filter((x: StatusKey) => x !== s)))}
+                onChange={(on) =>
+                  setStatusFilter((prev: StatusKey[]) =>
+                    on ? [...prev, s] : prev.filter((x: StatusKey) => x !== s)
+                  )
+                }
               />
             ))}
-            <button className="text-xs underline text-slate-500" onClick={() => setStatusFilter([])}>
+            <button
+              className="text-xs underline text-slate-500"
+              onClick={() => setStatusFilter([])}
+            >
               Clear
             </button>
           </div>
@@ -1189,7 +1468,11 @@ function QueueTable({
                 key={p}
                 checked={prioFilter.includes(p)}
                 label={`P${p}`}
-                onChange={(on) => setPrioFilter((prev: number[]) => (on ? [...prev, p] : prev.filter((x) => x !== p)))}
+                onChange={(on) =>
+                  setPrioFilter((prev: number[]) =>
+                    on ? [...prev, p] : prev.filter((x) => x !== p)
+                  )
+                }
               />
             ))}
             <button className="text-xs underline text-slate-500" onClick={() => setPrioFilter([])}>
@@ -1204,19 +1487,19 @@ function QueueTable({
         <div className="flex items-center gap-2">
           <button
             className="inline-flex items-center gap-1 px-2 py-1 rounded border text-sm bg-amber-600 text-white border-transparent hover:bg-amber-700"
-            onClick={() => doBulk("pause")}
+            onClick={() => doBulk('pause')}
           >
             <Pause size={14} /> Pause
           </button>
           <button
             className="inline-flex items-center gap-1 px-2 py-1 rounded border text-sm bg-emerald-600 text-white border-transparent hover:bg-emerald-700"
-            onClick={() => doBulk("resume")}
+            onClick={() => doBulk('resume')}
           >
             <Play size={14} /> Resume
           </button>
           <button
             className="inline-flex items-center gap-1 px-2 py-1 rounded border text-sm bg-rose-600 text-white border-transparent hover:bg-rose-700"
-            onClick={() => doBulk("cancel")}
+            onClick={() => doBulk('cancel')}
           >
             <XCircle size={14} /> Cancel
           </button>
@@ -1224,9 +1507,9 @@ function QueueTable({
             className="inline-flex items-center gap-1 px-2 py-1 rounded border text-sm bg-rose-700 text-white border-transparent hover:bg-rose-800"
             onClick={() =>
               askConfirm(
-                "Delete selected jobs?",
+                'Delete selected jobs?',
                 'This will permanently remove all selected jobs that are not running.\nType "confirm" to continue.',
-                async () => doBulk("delete")
+                async () => doBulk('delete')
               )
             }
           >
@@ -1234,20 +1517,22 @@ function QueueTable({
           </button>
 
           <div className="ml-3 text-xs text-slate-500 hidden sm:block">
-            {isManual ? "Drag rows to reorder." : `Sorted by ${sortKey} (${sortDir}). Disable sorting to drag.`}
+            {isManual
+              ? 'Drag rows to reorder.'
+              : `Sorted by ${sortKey} (${sortDir}). Disable sorting to drag.`}
           </div>
         </div>
 
         <div>
           <button
             className={clsx(
-              "inline-flex items-center gap-1 px-2 py-1 rounded border text-sm",
+              'inline-flex items-center gap-1 px-2 py-1 rounded border text-sm',
               isManual && orderChanged
-                ? "bg-brand-600 text-white border-transparent hover:bg-brand-700"
-                : "opacity-50 cursor-not-allowed bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700"
+                ? 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
+                : 'opacity-50 cursor-not-allowed bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'
             )}
             onClick={isManual && orderChanged ? saveOrder : undefined}
-            title={isManual ? "Save manual order" : "Disable sorting to save manual order"}
+            title={isManual ? 'Save manual order' : 'Disable sorting to save manual order'}
           >
             Save Order
           </button>
@@ -1280,12 +1565,12 @@ function QueueTable({
                   title="Select all filtered jobs"
                 />
               </th>
-              <th>{headerSortBtn("#", "manual")}</th>
-              <th>{headerSortBtn("Name", "name")}</th>
-              <th>{headerSortBtn("Priority", "priority")}</th>
+              <th>{headerSortBtn('#', 'manual')}</th>
+              <th>{headerSortBtn('Name', 'name')}</th>
+              <th>{headerSortBtn('Priority', 'priority')}</th>
               <th>Owner</th>
-              <th>{headerSortBtn("Created", "created_at")}</th>
-              <th>{headerSortBtn("Status", "status")}</th>
+              <th>{headerSortBtn('Created', 'created_at')}</th>
+              <th>{headerSortBtn('Status', 'status')}</th>
               <th>Progress</th>
               <th></th>
             </tr>
@@ -1304,12 +1589,17 @@ function QueueTable({
 
                   const hue = rowHue(j.status as StatusKey);
                   const isSelected = selected.has(j.id);
-                  const displayName = j.name.length > 60 ? j.name.slice(0, 57) + "…" : j.name;
+                  const displayName = j.name.length > 60 ? j.name.slice(0, 57) + '…' : j.name;
                   const createdAt = j.created_at as string | undefined;
                   const gIndex = globalIndex(j.id);
 
                   return (
-                    <DraggableRow key={j.id} id={j.id} hueClass={clsx(hue, isSelected && "ring-2 ring-brand-600/50")} dndEnabled={isManual}>
+                    <DraggableRow
+                      key={j.id}
+                      id={j.id}
+                      hueClass={clsx(hue, isSelected && 'ring-2 ring-brand-600/50')}
+                      dndEnabled={isManual}
+                    >
                       {(dragListeners: any) => (
                         <>
                           <td className="align-top">
@@ -1326,10 +1616,12 @@ function QueueTable({
                             <div className="flex items-center gap-2">
                               <button
                                 className={clsx(
-                                  "inline-flex items-center justify-center h-7 w-7 rounded border border-slate-300 dark:border-slate-700",
-                                  isManual ? "text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900" : "opacity-40 cursor-not-allowed"
+                                  'inline-flex items-center justify-center h-7 w-7 rounded border border-slate-300 dark:border-slate-700',
+                                  isManual
+                                    ? 'text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900'
+                                    : 'opacity-40 cursor-not-allowed'
                                 )}
-                                title={isManual ? "Drag to reorder" : "Disable sorting to drag"}
+                                title={isManual ? 'Drag to reorder' : 'Disable sorting to drag'}
                                 {...(isManual ? dragListeners : {})}
                               >
                                 ≡
@@ -1338,7 +1630,10 @@ function QueueTable({
                             </div>
                           </td>
 
-                          <td className="font-medium truncate whitespace-nowrap align-top" title={j.name}>
+                          <td
+                            className="font-medium truncate whitespace-nowrap align-top"
+                            title={j.name}
+                          >
                             {displayName}
                           </td>
 
@@ -1346,7 +1641,9 @@ function QueueTable({
                             <PriorityCell
                               jobId={j.id}
                               value={getPrio(j)}
-                              onChangeLocal={(next) => setPrioOverrides((m) => ({ ...m, [j.id]: next }))}
+                              onChangeLocal={(next) =>
+                                setPrioOverrides((m) => ({ ...m, [j.id]: next }))
+                              }
                               onSaved={() => {
                                 // nothing required; polling will reconcile; leave override so UI stays correct
                               }}
@@ -1356,7 +1653,11 @@ function QueueTable({
                                   const { [j.id]: _, ...rest } = m;
                                   return rest;
                                 });
-                                pushToast({ type: "error", title: "Failed to update priority", detail: String(err?.message || err) });
+                                pushToast({
+                                  type: 'error',
+                                  title: 'Failed to update priority',
+                                  detail: String(err?.message || err),
+                                });
                               }}
                             />
                           </td>
@@ -1364,13 +1665,18 @@ function QueueTable({
                           <td className="text-slate-500 truncate align-top">{j.owner}</td>
                           <td className="text-slate-500 align-top">{formatLocal(createdAt)}</td>
                           <td className="align-top">
-                            <span className="px-2 py-0.5 rounded-full border text-xs">{j.status}</span>
+                            <span className="px-2 py-0.5 rounded-full border text-xs">
+                              {j.status}
+                            </span>
                           </td>
 
                           <td className="align-top">
                             <div className="w-full">
                               <div className="h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-600" style={{ width: `${pct}%` }} />
+                                <div
+                                  className="h-full bg-emerald-600"
+                                  style={{ width: `${pct}%` }}
+                                />
                               </div>
                               <div className="text-xs text-slate-500 mt-1">
                                 {`${doneInclErrors}/${total}`} ({pct}%)
@@ -1378,12 +1684,18 @@ function QueueTable({
                                   <span className="ml-1">
                                     <span className="opacity-70">[</span>
                                     <span className="font-semibold">
-                                      {errors} error{errors !== 1 ? "s" : ""}
+                                      {errors} error{errors !== 1 ? 's' : ''}
                                     </span>
                                     <span className="opacity-70">]</span>
                                   </span>
                                 )}
-                                {j.matches_found ? <span className="font-semibold">, {j.matches_found} matches found</span> : ""}
+                                {j.matches_found ? (
+                                  <span className="font-semibold">
+                                    , {j.matches_found} matches found
+                                  </span>
+                                ) : (
+                                  ''
+                                )}
                               </div>
                             </div>
                           </td>
@@ -1393,15 +1705,23 @@ function QueueTable({
                               job={j}
                               onResume={() => onResume(j.id)}
                               onPause={() => onPause(j.id)}
-                              onCancel={() => askConfirm("Cancel job?", `This will stop the running job.\n\nJob: ${j.name}`, () => onCancel(j.id))}
+                              onCancel={() =>
+                                askConfirm(
+                                  'Cancel job?',
+                                  `This will stop the running job.\n\nJob: ${j.name}`,
+                                  () => onCancel(j.id)
+                                )
+                              }
                               onDelete={() =>
-                                askConfirm("Delete job?", `This will permanently remove the job and its results.\n\nJob: ${j.name}`, () =>
-                                  onDelete(j.id)
+                                askConfirm(
+                                  'Delete job?',
+                                  `This will permanently remove the job and its results.\n\nJob: ${j.name}`,
+                                  () => onDelete(j.id)
                                 )
                               }
                               onReset={() =>
                                 askConfirm(
-                                  "Reset job?",
+                                  'Reset job?',
                                   `This will set the job status to "queued" and all row states to "pending".\n\nJob: ${j.name}`,
                                   () => onReset(j.id)
                                 )
@@ -1410,7 +1730,9 @@ function QueueTable({
                               onTop={() => (isManual ? toTop(j.id) : undefined)}
                               onUp={() => (isManual ? moveUp(j.id) : undefined)}
                               onDown={() => (isManual ? moveDown(j.id) : undefined)}
-                              menuDisabledTip={!isManual ? "Move actions disabled while sorted" : undefined}
+                              menuDisabledTip={
+                                !isManual ? 'Move actions disabled while sorted' : undefined
+                              }
                             />
                           </td>
                         </>
@@ -1435,7 +1757,9 @@ function QueueTable({
       {/* Pagination (bottom) */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-slate-500">
-          Page {safePage} / {pageCount} — showing {baseRows.length ? `${start + 1}-${Math.min(end, baseRows.length)}` : "0"} of {baseRows.length}
+          Page {safePage} / {pageCount} — showing{' '}
+          {baseRows.length ? `${start + 1}-${Math.min(end, baseRows.length)}` : '0'} of{' '}
+          {baseRows.length}
         </div>
         <div className="flex items-center gap-2">
           {safePage > 1 && (
@@ -1445,7 +1769,7 @@ function QueueTable({
           )}
           <div className="flex items-center gap-1">
             {pageButtons.map((p, idx) =>
-              p === "dots" ? (
+              p === 'dots' ? (
                 <span key={`dots-${idx}`} className="px-2 text-slate-500">
                   …
                 </span>
@@ -1453,10 +1777,10 @@ function QueueTable({
                 <button
                   key={p}
                   className={clsx(
-                    "px-2 h-8 min-w-8 rounded border text-sm",
+                    'px-2 h-8 min-w-8 rounded border text-sm',
                     p === safePage
-                      ? "bg-brand-600 text-white border-transparent"
-                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700"
+                      ? 'bg-brand-600 text-white border-transparent'
+                      : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700'
                   )}
                   onClick={() => setPage(p)}
                 >
@@ -1470,7 +1794,11 @@ function QueueTable({
               Next
             </button>
           )}
-          <select className="input ml-2" value={pageSize} onChange={(e) => setPageSize(parseInt(e.target.value || "25", 10))}>
+          <select
+            className="input ml-2"
+            value={pageSize}
+            onChange={(e) => setPageSize(parseInt(e.target.value || '25', 10))}
+          >
             {[10, 25, 50].map((n) => (
               <option key={n} value={n}>
                 {n}/page
@@ -1519,7 +1847,11 @@ function RowActions({
   menuDisabledTip?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ x: number; y: number; up: boolean }>({ x: 0, y: 0, up: false });
+  const [coords, setCoords] = useState<{ x: number; y: number; up: boolean }>({
+    x: 0,
+    y: 0,
+    up: false,
+  });
   const btnRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -1546,18 +1878,18 @@ function RowActions({
       setOpen(false);
     };
     const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === 'Escape') setOpen(false);
     };
     const onScroll = () => setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onEsc);
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onEsc);
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onEsc);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
     };
   }, [open]);
 
@@ -1583,7 +1915,7 @@ function RowActions({
               </li>
             )}
 
-            {["running", "queued"].includes(job.status) ? (
+            {['running', 'queued'].includes(job.status) ? (
               <li>
                 <button
                   className="menu-item"
@@ -1598,7 +1930,7 @@ function RowActions({
             ) : (
               <li>
                 <button
-                  disabled={!["queued", "paused", "pausing"].includes(job.status)}
+                  disabled={!['queued', 'paused', 'pausing'].includes(job.status)}
                   className="menu-item disabled:opacity-50"
                   onClick={() => {
                     setOpen(false);
@@ -1636,7 +1968,7 @@ function RowActions({
 
             <li>
               <button
-                disabled={job.status !== "running"}
+                disabled={job.status !== 'running'}
                 className="menu-item !text-amber-700 dark:!text-amber-400 disabled:opacity-50"
                 onClick={() => {
                   setOpen(false);
@@ -1649,7 +1981,7 @@ function RowActions({
 
             <li>
               <button
-                disabled={job.status === "running" || job.status === "pausing"}
+                disabled={job.status === 'running' || job.status === 'pausing'}
                 className="menu-item !text-rose-600 dark:!text-rose-400 disabled:opacity-50"
                 onClick={() => {
                   setOpen(false);
@@ -1731,7 +2063,11 @@ function PriorityCell({
   const [saving, setSaving] = React.useState(false);
   const btnRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
-  const [coords, setCoords] = React.useState<{ x: number; y: number; up: boolean }>({ x: 0, y: 0, up: false });
+  const [coords, setCoords] = React.useState<{ x: number; y: number; up: boolean }>({
+    x: 0,
+    y: 0,
+    up: false,
+  });
 
   React.useEffect(() => {
     if (!open) setDraft(value);
@@ -1757,17 +2093,17 @@ function PriorityCell({
       if (btnRef.current?.contains(t)) return;
       setOpen(false);
     };
-    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onEsc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     const onScroll = () => setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onEsc);
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onEsc);
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onEsc);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
     };
   }, [open]);
 
@@ -1804,7 +2140,12 @@ function PriorityCell({
             style={{ left: coords.x, top: coords.y }}
           >
             <div className="flex items-center gap-2">
-              <select className="input w-full" value={draft} onChange={(e) => setDraft(parseInt(e.target.value || "3", 10))} disabled={saving}>
+              <select
+                className="input w-full"
+                value={draft}
+                onChange={(e) => setDraft(parseInt(e.target.value || '3', 10))}
+                disabled={saving}
+              >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
                     P{n}
@@ -1813,8 +2154,10 @@ function PriorityCell({
               </select>
               <button
                 className={clsx(
-                  "px-2 py-1 rounded border text-xs",
-                  saving ? "opacity-50 cursor-not-allowed" : "bg-brand-600 text-white border-transparent hover:bg-brand-700"
+                  'px-2 py-1 rounded border text-xs',
+                  saving
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
                 )}
                 onClick={saving ? undefined : doSave}
               >
