@@ -1,4 +1,4 @@
-// src/App.tsx
+﻿// src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -174,6 +174,120 @@ function ConfirmModal({
   );
 }
 
+function RenameJobDialog({
+  open,
+  job,
+  existingNames,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  job: Job | null;
+  existingNames: Set<string>;
+  onClose: () => void;
+  onSubmit: (jobId: string, nextName: string) => Promise<void>;
+}) {
+  const [value, setValue] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (open && job) {
+      setValue(job.name);
+      setSubmitError(null);
+    }
+  }, [open, job]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, saving, onClose]);
+
+  if (!open || !job) return null;
+
+  const trimmed = value.trim();
+  const normalized = trimmed.toLowerCase();
+  const originalNormalized = job.name.trim().toLowerCase();
+
+  let validation: string | null = null;
+  if (!trimmed) validation = 'Name is required';
+  else if (trimmed === job.name.trim()) validation = 'Enter a different name';
+  else if (existingNames.has(normalized) && normalized !== originalNormalized)
+    validation = 'That name is already in use';
+
+  const canSave = !validation && !saving;
+
+  const handleSubmit = async (event?: React.FormEvent) => {
+    if (event) event.preventDefault();
+    if (!job || validation) return;
+    setSaving(true);
+    setSubmitError(null);
+    try {
+      await onSubmit(job.id, trimmed);
+      onClose();
+    } catch (err: any) {
+      setSubmitError(String(err?.message || err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={saving ? undefined : onClose} />
+      <form
+        className="relative z-10 w-[min(92vw,420px)] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xl space-y-3"
+        onSubmit={handleSubmit}
+      >
+        <div className="text-lg font-semibold">Rename job</div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium" htmlFor="rename-job-input">
+            New name
+          </label>
+          <input
+            id="rename-job-input"
+            className="input w-full"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={saving}
+            autoFocus
+          />
+          {(validation || submitError) && (
+            <div className="text-sm text-rose-600 dark:text-rose-400">
+              {submitError || validation}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            className="btn"
+            onClick={saving ? undefined : onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className={clsx(
+              'btn',
+              canSave
+                ? 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
+                : 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body
+  );
+}
 /* ----------------------------- Data Fetching ----------------------------- */
 
 function useJobs() {
@@ -402,6 +516,16 @@ export default function App() {
               pushToast({ type: 'success', title: 'Failed tasks resetted' });
             } catch (e: any) {
               pushToast({ type: 'error', title: 'Reset failed', detail: String(e?.message || e) });
+            }
+          }}
+          onRename={async (id, name) => {
+            try {
+              await api.renameJob(id, name);
+              pushToast({ type: 'success', title: 'Name updated' });
+              await qc.invalidateQueries({ queryKey: ['jobs'] });
+            } catch (e: any) {
+              pushToast({ type: 'error', title: 'Rename failed', detail: String(e?.message || e) });
+              throw e;
             }
           }}
         />
@@ -1150,6 +1274,7 @@ function QueueTable({
   onDelete,
   onReset,
   onResetFailed,
+  onRename,
   pushToast,
 }: {
   jobs: Job[];
@@ -1170,6 +1295,7 @@ function QueueTable({
   onDelete: (id: string) => Promise<void>;
   onReset: (id: string) => Promise<void>;
   onResetFailed: (id: string) => Promise<void>;
+  onRename: (id: string, name: string) => Promise<void>;
   pushToast: (t: Omit<Toast, 'id'>) => void;
 }) {
   // pagination (persist page size)
@@ -1218,6 +1344,11 @@ function QueueTable({
   const isManual = sortKey === 'manual';
 
   const ownerOptions = useMemo(() => Array.from(new Set(jobs.map((j) => j.owner))).sort(), [jobs]);
+  const existingNameSet = useMemo(
+    () => new Set(jobs.map((item) => item.name.trim().toLowerCase())),
+    [jobs]
+  );
+  const [renameTarget, setRenameTarget] = useState<Job | null>(null);
 
   // apply filters (but preserve original global order)
   const filteredAll = useMemo(() => {
@@ -1847,11 +1978,14 @@ function QueueTable({
                             </div>
                           </td>
 
-                          <td
-                            className="font-medium truncate whitespace-nowrap align-top"
-                            title={j.name}
-                          >
-                            {displayName}
+                          <td className="font-medium align-top" title={j.name}>
+                            <button
+                              type="button"
+                              className="text-left whitespace-nowrap text-brand-700 hover:underline dark:text-brand-300"
+                              onClick={() => setRenameTarget(j)}
+                            >
+                              {displayName}
+                            </button>
                           </td>
 
                           <td className="align-top">
@@ -2031,6 +2165,14 @@ function QueueTable({
           </select>
         </div>
       </div>
+
+      <RenameJobDialog
+        open={!!renameTarget}
+        job={renameTarget}
+        existingNames={existingNameSet}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={onRename}
+      />
 
       <ConfirmModal
         open={confirm.open}

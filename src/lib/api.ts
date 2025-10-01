@@ -1,4 +1,4 @@
-// src/lib/api.ts
+﻿// src/lib/api.ts
 export type JobStatus =
   | 'queued'
   | 'running'
@@ -124,6 +124,15 @@ export const api = {
       })
     );
   },
+  async renameJob(jobId: string, name: string) {
+    return json(
+      await fetch(`/api/job/${jobId}/name`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+    );
+  },
   async updatePriority(jobId: string, priority: number) {
     return json(
       await fetch(`/api/job/${jobId}/priority?priority=${priority}`, {
@@ -136,3 +145,6 @@ export const api = {
     return json(await fetch('/api/stats/models'));
   },
 };
+
+
+
