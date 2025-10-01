@@ -1981,7 +1981,8 @@ function QueueTable({
                           <td className="font-medium align-top" title={j.name}>
                             <button
                               type="button"
-                              className="text-left whitespace-nowrap text-brand-700 hover:underline dark:text-brand-300"
+                              className="block w-full truncate whitespace-nowrap text-left text-slate-900 dark:text-slate-100 focus:outline-none"
+                              style={{ cursor: 'pointer' }}
                               onClick={() => setRenameTarget(j)}
                             >
                               {displayName}
