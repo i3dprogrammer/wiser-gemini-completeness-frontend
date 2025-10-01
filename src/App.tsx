@@ -752,7 +752,9 @@ function UploadCard({
         invalid = 0;
       const invalidSamples: string[] = [];
       const keySet = new Set<string>();
+      let lineNum = 0;
       for (const o of lines) {
+        lineNum++;
         const ref = o?.referenceProduct?.referenceAttributes;
         const tgt = o?.targetMerchant?.targetName || o?.targetMerchant?.targetHomepage;
         const hasKeys = ref && typeof ref === 'object' && Object.keys(ref).length > 0;
@@ -764,8 +766,8 @@ function UploadCard({
           invalid++;
           if (invalidSamples.length < 5) {
             const reason = !hasKeys
-              ? 'Missing referenceAttributes keys'
-              : 'Missing targetName/homepage';
+              ? 'Missing referenceAttributes keys [line ' + lineNum + ']'
+              : 'Missing targetName/homepage [line ' + lineNum + ']';
             invalidSamples.push(reason);
           }
         }
