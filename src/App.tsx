@@ -234,6 +234,8 @@ export default function App() {
 
   const [announcement] = useState<string | null>(null);
 
+  const [showModelStats, setShowModelStats] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
@@ -295,6 +297,7 @@ export default function App() {
             }
           }}
           pushToast={pushToast}
+          onOpenModelStats={() => setShowModelStats(true)}
         />
 
         <QueueTable
@@ -393,9 +396,157 @@ export default function App() {
               pushToast({ type: 'error', title: 'Reset failed', detail: String(e?.message || e) });
             }
           }}
+          onResetFailed={async (id) => {
+            try {
+              await api.resetFailed(id);
+              pushToast({ type: 'success', title: 'Failed tasks resetted' });
+            } catch (e: any) {
+              pushToast({ type: 'error', title: 'Reset failed', detail: String(e?.message || e) });
+            }
+          }}
         />
       </div>
+
+      <ModelStatsModal open={showModelStats} onClose={() => setShowModelStats(false)} />
     </div>
+  );
+}
+
+function ModelStatsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState<string | null>(null);
+  const [data, setData] = React.useState<any>(null);
+
+  // ⏱️ countdown to next 00:00 America/Los_Angeles
+  const [resetIn, setResetIn] = React.useState<string>('--:--');
+  React.useEffect(() => {
+    if (!open) return;
+
+    const tz = 'America/Los_Angeles';
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const calc = () => {
+      // get LA time parts without converting dates
+      const parts = fmt.formatToParts(new Date());
+      const get = (t: Intl.DateTimeFormatPartTypes) =>
+        Number(parts.find((p) => p.type === t)?.value ?? '0');
+      const h = get('hour');
+      const m = get('minute');
+      const s = get('second');
+
+      const elapsed = h * 3600 + m * 60 + s;
+      const left = Math.max(0, 24 * 3600 - elapsed); // seconds until 24:00 LA time
+      const hh = String(Math.floor(left / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((left % 3600) / 60)).padStart(2, '0');
+      setResetIn(`${hh}:${mm}`);
+    };
+
+    calc();
+    const id = setInterval(calc, 30_000); // update every 30s; cheap and smooth
+    return () => clearInterval(id);
+  }, [open]);
+
+  React.useEffect(() => {
+    let alive = true;
+    if (!open) return;
+    setData(null);
+    setErr(null);
+    setLoading(true);
+    (async () => {
+      try {
+        const d = await api.getModelStats();
+        if (alive) setData(d);
+      } catch (e: any) {
+        if (alive) setErr(String(e?.message || e));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const L = ({
+    k,
+    v,
+    mono = false,
+    strong = false,
+  }: {
+    k: string;
+    v: any;
+    mono?: boolean;
+    strong?: boolean;
+  }) => (
+    <div className="grid grid-cols-[240px_1fr] gap-2 items-start">
+      <div className="text-sm text-slate-500">{k}</div>
+      <div className={clsx('text-sm', mono && 'font-mono break-all', strong && 'font-semibold')}>
+        {v ?? '–'}
+      </div>
+    </div>
+  );
+
+  const fmtNum = (n: any) => n?.toLocaleString?.() ?? n;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative z-10 w-[min(92vw,920px)] max-h-[86vh] overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-lg font-semibold">Model Stats</div>
+          <button className="btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+
+        {loading && <div className="text-sm text-slate-500">Loading…</div>}
+        {err && <div className="text-sm text-rose-600">Error: {err}</div>}
+
+        {!!data && (
+          <div className="space-y-3">
+            <div className="rounded-md border p-3 bg-slate-50 dark:bg-slate-900/50">
+              <L k="Model name" v={data.model_name} strong />
+              <L k="Total Requests" v={fmtNum(data.total_requests)} />
+
+              {/* 🆕 Today / limit + time to reset */}
+              <L
+                k="Today's Requests Count"
+                v={
+                  <span className="font-mono">
+                    {fmtNum(data.requests_today ?? data.today_requests)} / {fmtNum(100000)}{' '}
+                    <span className="text-slate-500">(resets in {resetIn})</span>
+                  </span>
+                }
+              />
+            </div>
+
+            <div className="rounded-md border p-3 space-y-2">
+              <div>
+                <div className="text-sm text-slate-500 mb-1">Google Agent prompt</div>
+                <textarea className="input h-36" value={data.google_agent_prompt || ''} readOnly />
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 mb-1">Polaris Agent prompt</div>
+                <textarea className="input h-36" value={data.polaris_agent_prompt || ''} readOnly />
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 mb-1">Image Agent prompt</div>
+                <textarea className="input h-36" value={data.image_agent_prompt || ''} readOnly />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -407,10 +558,12 @@ function UploadCard({
   onUploaded,
   existingNames,
   pushToast,
+  onOpenModelStats,
 }: {
   onUploaded: (r: { job_id?: string; insertWhere?: InsertWhere }) => void;
   existingNames: Set<string>;
   pushToast: (t: Omit<Toast, 'id'>) => void;
+  onOpenModelStats: () => void;
 }) {
   type FileEntry = {
     id: string;
@@ -644,41 +797,50 @@ function UploadCard({
     <div className="card p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Create Tasks</h2>
+
+        <button
+          className="px-3 py-1 rounded border text-sm bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+          onClick={onOpenModelStats}
+        >
+          Stats
+        </button>
       </div>
 
       {/* Queue placement + Workers */}
-      <div className="grid gap-3 mt-3 sm:grid-cols-[auto_auto_1fr]">
+      <div className="grid gap-3 mt-3 sm:grid-cols-3">
         <div>
           <label className="block text-sm mb-1">Queue Placement</label>
-          <div className="flex items-center gap-2">
-            <select
-              className="input w-44"
-              value={queueMode}
-              onChange={(e) => setQueueMode(e.target.value as any)}
-            >
-              <option value="top">Top of Queue</option>
-              <option value="priority">Priority</option>
-            </select>
-            {queueMode === 'priority' && (
-              <select
-                className="input w-24"
-                value={priority}
-                onChange={(e) => setPriority(parseInt(e.target.value || '5', 10))}
-              >
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    P{n}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          <select
+            className="input w-full"
+            value={queueMode}
+            onChange={(e) => setQueueMode(e.target.value as any)}
+          >
+            <option value="top">Top of Queue</option>
+            <option value="priority">Priority</option>
+          </select>
         </div>
+
+        {queueMode === 'priority' && (
+          <div>
+            <label className="block text-sm mb-1">Priority</label>
+            <select
+              className="input w-full"
+              value={priority}
+              onChange={(e) => setPriority(parseInt(e.target.value || '5', 10))}
+            >
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  P{n}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm mb-1">Workers</label>
-          <input className="input w-28" value={50} readOnly />
-          <div className="text-xs text-slate-500 mt-1">Fixed to 50</div>
+          <input className="input w-full" value={50} readOnly />
+          <span className="text-xs text-slate-500 mt-1">Fixed to 50</span>
         </div>
       </div>
 
@@ -854,7 +1016,7 @@ function UploadCard({
       )}
 
       {/* Mapping preview (union) */}
-      {!!Object.keys(mapping).length && (
+      {files.length > 0 && !!Object.keys(mapping).length && (
         <div className="mt-4">
           <h3 className="text-md font-semibold mb-2">Reference Key Mapping (all files)</h3>
           <div className="border rounded-lg">
@@ -916,7 +1078,10 @@ function UploadCard({
         {files.length > 0 && (
           <button
             className="btn"
-            onClick={() => setFiles([])}
+            onClick={() => {
+              setFiles([]);
+              setMapping({});
+            }}
             disabled={busy}
             title="Clear selected files"
           >
@@ -984,6 +1149,7 @@ function QueueTable({
   onCancel,
   onDelete,
   onReset,
+  onResetFailed,
   pushToast,
 }: {
   jobs: Job[];
@@ -1003,6 +1169,7 @@ function QueueTable({
   onCancel: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReset: (id: string) => Promise<void>;
+  onResetFailed: (id: string) => Promise<void>;
   pushToast: (t: Omit<Toast, 'id'>) => void;
 }) {
   // pagination (persist page size)
@@ -1022,6 +1189,18 @@ function QueueTable({
 
   const [prioOverrides, setPrioOverrides] = useState<Record<string, number>>({});
   const getPrio = (j: Job) => (j.id in prioOverrides ? prioOverrides[j.id] : (j.priority ?? 5));
+
+  const formatLocal = (iso?: string | null) => {
+    if (!iso) return '–';
+    const d = new Date(iso);
+    const pad = (n: number) => (n < 10 ? '0' : '') + n;
+    const dd = pad(d.getDate());
+    const mm = pad(d.getMonth() + 1);
+    const yyyy = d.getFullYear();
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  };
 
   // sorting
   const [sortKey, setSortKey] = useState<SortKey>('manual');
@@ -1043,18 +1222,59 @@ function QueueTable({
   // apply filters (but preserve original global order)
   const filteredAll = useMemo(() => {
     const qn = q.trim().toLowerCase();
+    const qParts = qn
+      .split('|')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
     return jobs.filter((j) => {
       const ownerOk = ownerFilter.length === 0 || ownerFilter.includes(j.owner);
       const statusOk = statusFilter.length === 0 || statusFilter.includes(j.status as StatusKey);
       const prioOk = prioFilter.length === 0 || prioFilter.includes(getPrio(j));
-      const qOk =
-        !qn ||
-        [j.name, j.owner, j.status, String(j.priority ?? '')].some((v) =>
-          v?.toLowerCase().includes(qn)
-        );
+
+      const haystack = [
+        j.name,
+        j.owner,
+        j.status,
+        String(j.priority ?? ''),
+        formatLocal(j.created_at),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const qOk = !qn || qParts.length === 0 || qParts.every((part) => haystack.includes(part));
+
       return ownerOk && statusOk && prioOk && qOk;
     });
   }, [jobs, ownerFilter, statusFilter, prioFilter, q]);
+
+  const completedVisibleJobs = useMemo(
+    () => filteredAll.filter((j) => j.status === 'completed').length,
+    [filteredAll]
+  );
+  const pendingVisibleJobs = useMemo(
+    () => filteredAll.filter((j) => j.status === 'queued' || j.status === 'running').length,
+    [filteredAll]
+  );
+
+  const completedVisibleTasks = useMemo(
+    () =>
+      filteredAll.reduce(
+        (sum, item) => sum + item.processed_rows + (item.error_rows ? item.error_rows : 0),
+        0
+      ),
+    [filteredAll]
+  );
+  const pendingVisibleTasks = useMemo(
+    () =>
+      filteredAll.reduce(
+        (sum, item) =>
+          sum + (item.total_rows - (item.processed_rows + (item.error_rows ? item.error_rows : 0))),
+        0
+      ),
+    [filteredAll]
+  );
 
   // ordering state for manual drag
   const [rows, setRows] = useState<Job[]>(filteredAll);
@@ -1287,17 +1507,6 @@ function QueueTable({
         return '';
     }
   };
-  const formatLocal = (iso?: string | null) => {
-    if (!iso) return '–';
-    const d = new Date(iso);
-    const pad = (n: number) => (n < 10 ? '0' : '') + n;
-    const dd = pad(d.getDate());
-    const mm = pad(d.getMonth() + 1);
-    const yyyy = d.getFullYear();
-    const hh = pad(d.getHours());
-    const mi = pad(d.getMinutes());
-    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
-  };
 
   // pagination buttons model: 1 … cur cur+1 cur+2 … last
   const pageButtons = React.useMemo<(number | 'dots')[]>(() => {
@@ -1410,6 +1619,14 @@ function QueueTable({
         </div>
         <span className="text-sm text-slate-500 shrink-0">
           {isFetching ? 'Refreshing…' : 'Up to date'}
+          <span className="ml-3">
+            Completed: <span className="font-semibold">{completedVisibleJobs}</span> (
+            {completedVisibleTasks} tasks)
+          </span>
+          <span className="ml-3">
+            Pending: <span className="font-semibold">{pendingVisibleJobs}</span> (
+            {pendingVisibleTasks} tasks)
+          </span>
         </span>
       </div>
 
@@ -1726,6 +1943,13 @@ function QueueTable({
                                   () => onReset(j.id)
                                 )
                               }
+                              onResetFailed={() =>
+                                askConfirm(
+                                  'Reset failed tasks?',
+                                  `This will set the job status to "queued" and all failed task states to "pending".\n\nJob: ${j.name}`,
+                                  () => onResetFailed(j.id)
+                                )
+                              }
                               onExport={() => onExport(j.id)}
                               onTop={() => (isManual ? toTop(j.id) : undefined)}
                               onUp={() => (isManual ? moveUp(j.id) : undefined)}
@@ -1832,6 +2056,7 @@ function RowActions({
   onUp,
   onDown,
   onReset,
+  onResetFailed,
   menuDisabledTip,
 }: {
   job: Job;
@@ -1844,6 +2069,7 @@ function RowActions({
   onUp?: () => void;
   onDown?: () => void;
   onReset: () => void;
+  onResetFailed: () => void;
   menuDisabledTip?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -1956,6 +2182,7 @@ function RowActions({
 
             <li>
               <button
+                disabled={['running', 'pausing'].includes(job.status)}
                 className="menu-item"
                 onClick={() => {
                   setOpen(false);
@@ -1963,6 +2190,19 @@ function RowActions({
                 }}
               >
                 <RotateCcw size={14} className="mr-2" /> Reset job
+              </button>
+            </li>
+
+            <li>
+              <button
+                disabled={['running', 'pausing'].includes(job.status)}
+                className="menu-item"
+                onClick={() => {
+                  setOpen(false);
+                  onResetFailed();
+                }}
+              >
+                <RotateCcw size={14} className="mr-2" /> Reset failed tasks
               </button>
             </li>
 
