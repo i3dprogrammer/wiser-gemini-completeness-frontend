@@ -1,4 +1,4 @@
-﻿// src/App.tsx
+// src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -530,6 +530,8 @@ export default function App() {
           }}
         />
       </div>
+
+      <footer className='container my-10 text-center text-sm text-slate-500 dark:text-slate-400'>Gemini Based Completeness</footer>
 
       <ModelStatsModal open={showModelStats} onClose={() => setShowModelStats(false)} />
     </div>
