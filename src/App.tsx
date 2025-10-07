@@ -709,6 +709,7 @@ function UploadCard({
 
   const [prompt, setPrompt] = useState('');
   const [validate, setValidate] = useState(false);
+  const [validateGoogleMatches, setValidateGoogleMatches] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Mapping (union of keys across all files) + history
@@ -881,6 +882,7 @@ function UploadCard({
         fd.set('name', name);
         fd.set('additional_prompt', prompt);
         fd.set('validate_images', String(validate));
+        fd.set('validate_google_matches_via_polaris', String(validateGoogleMatches));
         fd.set('worker_concurrency', String(50));
         fd.set('file', entry.file);
         fd.set('mapping', JSON.stringify(mapping));
@@ -907,6 +909,7 @@ function UploadCard({
       setFiles([]);
       setPrompt('');
       setValidate(false);
+      setValidateGoogleMatches(false);
       setMapping({});
       setQueueMode('priority');
       setPriority(5);
@@ -984,7 +987,7 @@ function UploadCard({
         />
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-4">
         <label className="inline-flex items-center gap-2">
           <input
             type="checkbox"
@@ -994,6 +997,25 @@ function UploadCard({
           />
           <span>Validate Images</span>
         </label>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="checkbox"
+              checked={validateGoogleMatches}
+              onChange={(e) => setValidateGoogleMatches(e.target.checked)}
+            />
+            <span>Validate Google Matches</span>
+          </label>
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+            title="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search"
+            aria-label="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search"
+          >
+            <Info size={14} />
+          </button>
+        </div>
       </div>
 
       {/* File drop/select */}
@@ -2809,3 +2831,8 @@ function PriorityCell({
     </>
   );
 }
+
+
+
+
+
