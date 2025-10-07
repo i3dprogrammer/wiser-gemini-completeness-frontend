@@ -2660,7 +2660,6 @@ function RowActions({
         title={canShowStats ? 'Show stats' : 'Stats available after some tasks are processed'}
       >
         <BarChart3 size={14} />
-        <span>Show stats</span>
       </button>
       <div className="relative">
         <button
