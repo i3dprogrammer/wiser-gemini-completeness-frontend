@@ -997,6 +997,13 @@ function UploadCard({
           />
           <span>Validate Images</span>
         </label>
+        <span
+          className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+          title="Enabling this will validate if found product image matches reference product image. This requires a reference product image to be find and a match product image to be found. Do note that this WILL not throw away results, it just adds another column called 'Image Match' with whether the product images match or not but we're still getting all matches"
+          aria-label="Enabling this will validate if found product image matches reference product image. This requires a reference product image to be find and a match product image to be found. Do note that this WILL not throw away results, it just adds another column called 'Image Match' with whether the product images match or not but we're still getting all matches"
+        >
+          <Info size={14} />
+        </span>
         <div className="flex items-center gap-2">
           <label className="inline-flex items-center gap-2">
             <input
@@ -1007,14 +1014,13 @@ function UploadCard({
             />
             <span>Validate Google Matches</span>
           </label>
-          <button
-            type="button"
+          <span
             className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
-            title="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search"
-            aria-label="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search"
+            title="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search. Do note this will change 'Found Result' from True to False but it will keep invalid URL in export. If Polaris is experiencing high blocking or high error rate for a certain domain it can throw away valid matches"
+            aria-label="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search. Do note this will change 'Found Result' from True to False but it will keep invalid URL in export. If Polaris is experiencing high blocking or high error rate for a certain domain it can throw away valid matches"
           >
             <Info size={14} />
-          </button>
+          </span>
         </div>
       </div>
 
@@ -2831,8 +2837,3 @@ function PriorityCell({
     </>
   );
 }
-
-
-
-
-
