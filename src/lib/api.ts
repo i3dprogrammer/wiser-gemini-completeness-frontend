@@ -53,11 +53,24 @@ export type JobDomainStat = {
   potentialMatches: number;
   completeness: number;
 };
+export type JobStatsSummary = {
+  createdAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  totalDurationSeconds: number | null;
+  totalCost: number;
+  totalGeminiRequests: number;
+  foundViaGoogle: number;
+  foundViaPolaris: number;
+};
+
 
 export type JobStats = {
   jobId: string;
   jobName: string;
   domains: JobDomainStat[];
+  summary: JobStatsSummary;
+  tableError?: string | null;
 };
 
 type RawJobDomainStat = Omit<JobDomainStat, 'dqMr' | 'potentialMatches'> & {
@@ -65,10 +78,23 @@ type RawJobDomainStat = Omit<JobDomainStat, 'dqMr' | 'potentialMatches'> & {
   potential_matches: JobDomainStat['potentialMatches'];
 };
 
+type RawJobStatsSummary = {
+  created_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  total_duration_seconds: number | null;
+  total_cost: number;
+  total_gemini_requests: number;
+  found_via_google: number;
+  found_via_polaris: number;
+};
+
 type RawJobStatsResponse = {
   job_id: string;
   job_name: string;
   domains: RawJobDomainStat[];
+  summary: RawJobStatsSummary;
+  table_error?: string | null;
 };
 const json = async <T = any>(res: Response): Promise<T> => {
   if (!res.ok) {
@@ -156,6 +182,17 @@ export const api = {
         potentialMatches: d.potential_matches,
         completeness: d.completeness,
       })),
+      summary: {
+        createdAt: res.summary?.created_at ?? null,
+        startedAt: res.summary?.started_at ?? null,
+        finishedAt: res.summary?.finished_at ?? null,
+        totalDurationSeconds: res.summary?.total_duration_seconds ?? null,
+        totalCost: res.summary?.total_cost ?? 0,
+        totalGeminiRequests: res.summary?.total_gemini_requests ?? 0,
+        foundViaGoogle: res.summary?.found_via_google ?? 0,
+        foundViaPolaris: res.summary?.found_via_polaris ?? 0,
+      },
+      tableError: res.table_error ?? null,
     };
   },
   async upload(fd: FormData) {
@@ -192,6 +229,12 @@ export const api = {
     return json(await fetch('/api/stats/models'));
   },
 };
+
+
+
+
+
+
 
 
 

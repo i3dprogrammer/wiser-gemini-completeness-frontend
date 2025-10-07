@@ -2339,17 +2339,47 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
   if (!open) return null;
 
   const displayName = stats?.jobName || jobName;
+  const summary = stats?.summary;
+  const tableError = stats?.tableError;
 
   const formatInt = (value: number) => (Number.isFinite(value) ? value.toLocaleString() : '-');
-  // const formatDecimal = (value: number) =>
-  //   Number.isFinite(value)
-  //     ? value.toLocaleString(undefined, {
-  //         minimumFractionDigits: 2,
-  //         maximumFractionDigits: 2,
-  //       })
-  //     : '-';
   const formatPercent = (value: number) =>
     Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : '-';
+  const formatDateTime = (iso?: string | null) => {
+    if (!iso) return '-';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '-';
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const dd = pad(date.getDate());
+    const mm = pad(date.getMonth() + 1);
+    const yyyy = date.getFullYear();
+    const hh = pad(date.getHours());
+    const mi = pad(date.getMinutes());
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  };
+  const formatDuration = (seconds?: number | null) => {
+    if (seconds == null || !Number.isFinite(seconds)) return '-';
+    const total = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    if (!hours && !minutes) {
+      return `${secs}s`;
+    }
+    const parts: string[] = [];
+    if (hours) parts.push(`${hours}h`);
+    if (minutes) parts.push(`${minutes}m`);
+    if (!hours && secs) parts.push(`${secs}s`);
+    return parts.join(' ') || '0s';
+  };
+  const formatCost = (value: number) =>
+    Number.isFinite(value)
+      ? `$${value.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
+      : '-';
+
+  const hasStats = Boolean(stats);
+  const domains = stats?.domains ?? [];
+  const hasDomains = domains.length > 0;
 
   return createPortal(
     <div className="fixed inset-0 z-[1100] flex items-center justify-center">
@@ -2385,80 +2415,130 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                 </button>
               </div>
             </div>
-          ) : !stats || stats.domains.length === 0 ? (
+          ) : !hasStats ? (
             <div className="py-10 text-center text-sm text-slate-500">No stats available yet.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
-                <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700">
-                      Domain
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Catalog
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Matched
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Unmatched
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Sampled
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Found
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      DQ MR %
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Potential matches
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                      Completeness %
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.domains.map((row) => {
-                    const completenessClasses = clsx(
-                      'inline-flex items-center rounded px-2 py-1 text-xs font-semibold',
-                      row.completeness >= 0.92
-                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
-                        : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100'
-                    );
-
-                    return (
-                      <tr
-                        key={row.domain}
-                        className="border-b border-slate-200 dark:border-slate-700 last:border-b-0"
-                      >
-                        <td className="px-3 py-2 align-top font-medium">{row.domain || 'N/A'}</td>
-                        <td className="px-3 py-2 align-top text-right">{formatInt(row.catalog)}</td>
-                        <td className="px-3 py-2 align-top text-right">{formatInt(row.matched)}</td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {formatInt(row.unmatched)}
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">{formatInt(row.sampled)}</td>
-                        <td className="px-3 py-2 align-top text-right">{formatInt(row.found)}</td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {formatPercent(row.dqMr)}
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {formatInt(row.potentialMatches)}
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">
-                          <span className={completenessClasses}>
-                            {formatPercent(row.completeness)}
-                          </span>
-                        </td>
+            <div className="space-y-6">
+              {tableError ? (
+                <div className="rounded-md border border-amber-300 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                  {tableError}
+                </div>
+              ) : hasDomains ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
+                    <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700">
+                          Domain
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Catalog
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Matched
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Unmatched
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Sampled
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Found
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          DQ MR %
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Potential matches
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Completeness %
+                        </th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {domains.map((row) => {
+                        const completenessClasses = clsx(
+                          'inline-flex items-center rounded px-2 py-1 text-xs font-semibold',
+                          row.completeness >= 0.92
+                            ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
+                            : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100'
+                        );
+
+                        return (
+                          <tr
+                            key={row.domain}
+                            className="border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                          >
+                            <td className="px-3 py-2 align-top font-medium">{row.domain || 'N/A'}</td>
+                            <td className="px-3 py-2 align-top text-right">{formatInt(row.catalog)}</td>
+                            <td className="px-3 py-2 align-top text-right">{formatInt(row.matched)}</td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.unmatched)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">{formatInt(row.sampled)}</td>
+                            <td className="px-3 py-2 align-top text-right">{formatInt(row.found)}</td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatPercent(row.dqMr)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.potentialMatches)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">
+                              <span className={completenessClasses}>
+                                {formatPercent(row.completeness)}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-10 text-center text-sm text-slate-500">No stats available yet.</div>
+              )}
+
+              {summary && (
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                  <div className="text-sm font-semibold mb-3">Job totals</div>
+                  <dl className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Created</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDateTime(summary.createdAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Started</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDateTime(summary.startedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Finished</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDateTime(summary.finishedAt)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total time</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDuration(summary.totalDurationSeconds)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total cost</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatCost(summary.totalCost)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total Gemini requests</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatInt(summary.totalGeminiRequests)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Found via Google</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatInt(summary.foundViaGoogle)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Found via Polaris</dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatInt(summary.foundViaPolaris)}</dd>
+                    </div>
+                  </dl>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2861,3 +2941,4 @@ function PriorityCell({
     </>
   );
 }
+
