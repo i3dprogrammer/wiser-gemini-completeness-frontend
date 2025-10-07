@@ -1,4 +1,4 @@
-﻿// src/lib/api.ts
+// src/lib/api.ts
 export type JobStatus =
   | 'queued'
   | 'running'
@@ -41,6 +41,35 @@ export type ModelStats = {
   today_requests?: number;
 };
 
+
+export type JobDomainStat = {
+  domain: string;
+  catalog: number;
+  matched: number;
+  unmatched: number;
+  sampled: number;
+  found: number;
+  dqMr: number;
+  potentialMatches: number;
+  completeness: number;
+};
+
+export type JobStats = {
+  jobId: string;
+  jobName: string;
+  domains: JobDomainStat[];
+};
+
+type RawJobDomainStat = Omit<JobDomainStat, 'dqMr' | 'potentialMatches'> & {
+  dq_mr: JobDomainStat['dqMr'];
+  potential_matches: JobDomainStat['potentialMatches'];
+};
+
+type RawJobStatsResponse = {
+  job_id: string;
+  job_name: string;
+  domains: RawJobDomainStat[];
+};
 const json = async <T = any>(res: Response): Promise<T> => {
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
@@ -111,6 +140,24 @@ export const api = {
     return json(await fetch(`/api/job/${id}/rows/progress`));
   },
 
+  async jobStats(jobId: string): Promise<JobStats> {
+    const res = await json<RawJobStatsResponse>(await fetch(`/api/job/${jobId}/stats`));
+    return {
+      jobId: res.job_id,
+      jobName: res.job_name,
+      domains: res.domains.map((d) => ({
+        domain: d.domain,
+        catalog: d.catalog,
+        matched: d.matched,
+        unmatched: d.unmatched,
+        sampled: d.sampled,
+        found: d.found,
+        dqMr: d.dq_mr,
+        potentialMatches: d.potential_matches,
+        completeness: d.completeness,
+      })),
+    };
+  },
   async upload(fd: FormData) {
     return json(await fetch('/api/upload', { method: 'POST', body: fd }));
   },
@@ -145,6 +192,13 @@ export const api = {
     return json(await fetch('/api/stats/models'));
   },
 };
+
+
+
+
+
+
+
 
 
 

@@ -1,9 +1,9 @@
 // src/App.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './lib/api';
-import type { Job, Progress } from './lib/api';
+import type { Job, Progress, JobStats } from './lib/api';
 import {
   Pause,
   Play,
@@ -17,6 +17,7 @@ import {
   Info,
   RotateCcw,
   ArrowUpDown,
+  BarChart3,
 } from 'lucide-react';
 import ThemeToggle from './components/ThemeToggle';
 import clsx from 'clsx';
@@ -349,6 +350,7 @@ export default function App() {
   const [announcement] = useState<string | null>(null);
 
   const [showModelStats, setShowModelStats] = useState(false);
+
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
@@ -1354,6 +1356,69 @@ function QueueTable({
   );
   const [renameTarget, setRenameTarget] = useState<Job | null>(null);
 
+
+  const [statsJob, setStatsJob] = useState<Job | null>(null);
+  const [jobStats, setJobStats] = useState<JobStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const statsRequestSeq = useRef(0);
+
+  const closeStatsModal = useCallback(() => {
+    statsRequestSeq.current += 1;
+    setStatsJob(null);
+    setJobStats(null);
+    setStatsError(null);
+    setStatsLoading(false);
+  }, []);
+
+  const fetchJobStats = useCallback(
+    async (jobId: string, resetData: boolean) => {
+      const seq = ++statsRequestSeq.current;
+      setStatsLoading(true);
+      setStatsError(null);
+      if (resetData) {
+        setJobStats(null);
+      }
+      try {
+        const res = await api.jobStats(jobId);
+        if (statsRequestSeq.current === seq) {
+          setJobStats(res);
+        }
+      } catch (err: any) {
+        if (statsRequestSeq.current === seq) {
+          setStatsError(String(err?.message || err));
+        }
+      } finally {
+        if (statsRequestSeq.current === seq) {
+          setStatsLoading(false);
+        }
+      }
+    },
+    [],
+  );
+
+  const statsJobId = statsJob?.id;
+
+  useEffect(() => {
+    if (!statsJobId) return;
+    fetchJobStats(statsJobId, true);
+  }, [statsJobId, fetchJobStats]);
+
+  useEffect(() => {
+    if (statsJob && !jobs.some((j) => j.id === statsJob.id)) {
+      closeStatsModal();
+    }
+  }, [jobs, statsJob, closeStatsModal]);
+
+  const retryStats = useCallback(() => {
+    if (statsJobId) {
+      fetchJobStats(statsJobId, false);
+    }
+  }, [fetchJobStats, statsJobId]);
+
+  const handleShowStats = useCallback((job: Job) => {
+    setStatsJob(job);
+  }, []);
   // apply filters (but preserve original global order)
   const filteredAll = useMemo(() => {
     const qn = q.trim().toLowerCase();
@@ -2089,6 +2154,7 @@ function QueueTable({
                                   () => onResetFailed(j.id)
                                 )
                               }
+                              onShowStats={() => handleShowStats(j)}
                               onExport={() => onExport(j.id)}
                               onTop={() => (isManual ? toTop(j.id) : undefined)}
                               onUp={() => (isManual ? moveUp(j.id) : undefined)}
@@ -2171,6 +2237,15 @@ function QueueTable({
         </div>
       </div>
 
+      <StatsModal
+        open={!!statsJob}
+        jobName={statsJob?.name || ''}
+        stats={jobStats}
+        loading={statsLoading}
+        error={statsError}
+        onClose={closeStatsModal}
+        onRetry={retryStats}
+      />
       <RenameJobDialog
         open={!!renameTarget}
         job={renameTarget}
@@ -2190,6 +2265,152 @@ function QueueTable({
   );
 }
 
+type StatsModalProps = {
+  open: boolean;
+  jobName: string;
+  stats: JobStats | null;
+  loading: boolean;
+  error: string | null;
+  onClose: () => void;
+  onRetry: () => void;
+};
+
+function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: StatsModalProps) {
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const displayName = stats?.jobName || jobName;
+
+  const formatInt = (value: number) =>
+    Number.isFinite(value) ? value.toLocaleString() : '-';
+  const formatDecimal = (value: number) =>
+    Number.isFinite(value)
+      ? value.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : '-';
+  const formatPercent = (value: number) =>
+    Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : '-';
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative z-10 w-[min(960px,94vw)] max-h-[85vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div>
+            <div className="text-lg font-semibold">Job stats</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
+              {displayName || 'Unnamed job'}
+            </div>
+          </div>
+          <button
+            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={onClose}
+            aria-label="Close stats"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 max-h-[calc(85vh-72px)] overflow-auto">
+          {loading ? (
+            <div className="py-10 text-center text-sm text-slate-500">Loading stats...</div>
+          ) : error ? (
+            <div className="space-y-4">
+              <div className="rounded-md border border-amber-300 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                {error}
+              </div>
+              <div className="flex justify-end">
+                <button className="btn" onClick={onRetry}>
+                  Retry
+                </button>
+              </div>
+            </div>
+          ) : !stats || stats.domains.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-500">No stats available yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
+                <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700">
+                      Domain
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Catalog
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Matched
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Unmatched
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Sampled
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Found
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      DQ MR %
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Potential matches
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                      Completeness %
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.domains.map((row) => {
+                    const completenessClasses = clsx(
+                      'inline-flex items-center rounded px-2 py-1 text-xs font-semibold',
+                      row.completeness >= 0.92
+                        ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
+                        : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100'
+                    );
+
+                    return (
+                      <tr
+                        key={row.domain}
+                        className="border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                      >
+                        <td className="px-3 py-2 align-top font-medium">{row.domain || 'N/A'}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatInt(row.catalog)}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatInt(row.matched)}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatInt(row.unmatched)}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatInt(row.sampled)}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatInt(row.found)}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatPercent(row.dqMr)}</td>
+                        <td className="px-3 py-2 align-top text-right">{formatDecimal(row.potentialMatches)}</td>
+                        <td className="px-3 py-2 align-top text-right">
+                          <span className={completenessClasses}>{formatPercent(row.completeness)}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 /* ------------------------------ RowActions ------------------------------ */
 
 function RowActions({
@@ -2199,6 +2420,7 @@ function RowActions({
   onCancel,
   onDelete,
   onExport,
+  onShowStats,
   onTop,
   onUp,
   onDown,
@@ -2212,6 +2434,7 @@ function RowActions({
   onCancel: () => void;
   onDelete: () => void;
   onExport: () => void;
+  onShowStats: () => void;
   onTop?: () => void;
   onUp?: () => void;
   onDown?: () => void;
@@ -2227,6 +2450,8 @@ function RowActions({
   });
   const btnRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
+
+  const canShowStats = job.processed_rows > 0;
 
   // open menu as portal, fixed positioning to avoid clipping
   const openMenu = () => {
@@ -2327,6 +2552,22 @@ function RowActions({
               </button>
             </li>
 
+            <li>
+              <button
+                className="menu-item disabled:opacity-50"
+                onClick={() => {
+                  if (!canShowStats) return;
+                  setOpen(false);
+                  onShowStats();
+                }}
+                disabled={!canShowStats}
+                title={
+                  canShowStats ? undefined : 'Stats available after some tasks are processed'
+                }
+              >
+                <BarChart3 size={14} className="mr-2" /> Show stats
+              </button>
+            </li>
             <li>
               <button
                 disabled={['running', 'pausing'].includes(job.status)}
@@ -2564,3 +2805,31 @@ function PriorityCell({
     </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
