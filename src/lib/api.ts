@@ -38,7 +38,9 @@ export type ModelStats = {
   polaris_agent_prompt: string;
   image_agent_prompt: string;
   total_requests: number;
-  today_requests?: number;
+  today_requests: number;
+  total_cost: number;
+  today_cost: number;
 };
 
 

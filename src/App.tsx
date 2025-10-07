@@ -624,6 +624,15 @@ function ModelStatsModal({ open, onClose }: { open: boolean; onClose: () => void
   );
 
   const fmtNum = (n: any) => n?.toLocaleString?.() ?? n;
+  const fmtUsd = (value: number | null | undefined) =>
+    typeof value === 'number'
+      ? value.toLocaleString(undefined, {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 4,
+          maximumFractionDigits: 4,
+        })
+      : '--';
 
   return createPortal(
     <div className="fixed inset-0 z-[1000] flex items-center justify-center">
@@ -644,13 +653,21 @@ function ModelStatsModal({ open, onClose }: { open: boolean; onClose: () => void
             <div className="rounded-md border p-3 bg-slate-50 dark:bg-slate-900/50">
               <L k="Model name" v={data.model_name} strong />
               <L k="Total Requests" v={fmtNum(data.total_requests)} />
-
-              {/* 🆕 Today / limit + time to reset */}
+              <L k="Total Cost (USD)" v={fmtUsd(data.total_cost)} />
               <L
-                k="Today's Requests Count"
+                k="Today's Requests"
                 v={
                   <span className="font-mono">
-                    {fmtNum(data.requests_today ?? data.today_requests)} / {fmtNum(100000)}{' '}
+                    {fmtNum(data.today_requests)} / {fmtNum(100000)}{' '}
+                    <span className="text-slate-500">(resets in {resetIn})</span>
+                  </span>
+                }
+              />
+              <L
+                k="Today's Cost (USD)"
+                v={
+                  <span className="font-mono">
+                    {fmtUsd(data.today_cost)}{' '}
                     <span className="text-slate-500">(resets in {resetIn})</span>
                   </span>
                 }
