@@ -710,6 +710,7 @@ function UploadCard({
   const [prompt, setPrompt] = useState('');
   const [validate, setValidate] = useState(false);
   const [validateGoogleMatches, setValidateGoogleMatches] = useState(false);
+  const [allowMultipleFoundURLs, setAllowMultipleFoundURLs] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Mapping (union of keys across all files) + history
@@ -883,6 +884,7 @@ function UploadCard({
         fd.set('additional_prompt', prompt);
         fd.set('validate_images', String(validate));
         fd.set('validate_google_matches_via_polaris', String(validateGoogleMatches));
+        fd.set('allow_multiple_found_urls', String(allowMultipleFoundURLs));
         fd.set('worker_concurrency', String(50));
         fd.set('file', entry.file);
         fd.set('mapping', JSON.stringify(mapping));
@@ -910,6 +912,7 @@ function UploadCard({
       setPrompt('');
       setValidate(false);
       setValidateGoogleMatches(false);
+      setAllowMultipleFoundURLs(false);
       setMapping({});
       setQueueMode('priority');
       setPriority(5);
@@ -988,22 +991,24 @@ function UploadCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-4">
-        <label className="inline-flex items-center gap-2">
-          <input
-            type="checkbox"
-            className="checkbox"
-            checked={validate}
-            onChange={(e) => setValidate(e.target.checked)}
-          />
-          <span>Validate Images</span>
-        </label>
-        <span
-          className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
-          title="Enabling this will validate if found product image matches reference product image. This requires a reference product image to be find and a match product image to be found. Do note that this WILL not throw away results, it just adds another column called 'Image Match' with whether the product images match or not but we're still getting all matches"
-          aria-label="Enabling this will validate if found product image matches reference product image. This requires a reference product image to be find and a match product image to be found. Do note that this WILL not throw away results, it just adds another column called 'Image Match' with whether the product images match or not but we're still getting all matches"
-        >
-          <Info size={14} />
-        </span>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="checkbox"
+              checked={validate}
+              onChange={(e) => setValidate(e.target.checked)}
+            />
+            <span>Validate Images</span>
+          </label>
+          <span
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+            title="Enabling this will validate if found product image matches reference product image. This requires a reference product image to be find and a match product image to be found. Do note that this WILL not throw away results, it just adds another column called 'Images match' with whether the product images match or not but we're still getting all matches"
+            aria-label="Enabling this will validate if found product image matches reference product image. This requires a reference product image to be find and a match product image to be found. Do note that this WILL not throw away results, it just adds another column called 'Images match' with whether the product images match or not but we're still getting all matches"
+          >
+            <Info size={14} />
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <label className="inline-flex items-center gap-2">
             <input
@@ -1016,8 +1021,27 @@ function UploadCard({
           </label>
           <span
             className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
-            title="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search. Do note this will change 'Found Result' from True to False but it will keep invalid URL in export. If Polaris is experiencing high blocking or high error rate for a certain domain it can throw away valid matches"
-            aria-label="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search. Do note this will change 'Found Result' from True to False but it will keep invalid URL in export. If Polaris is experiencing high blocking or high error rate for a certain domain it can throw away valid matches"
+            title="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search. Do note this will change 'Found Result' from True to False but it will keep invalidated URLs in the export. If Polaris is experiencing high blocking or high error rate for a certain domain enabling this can throw away valid matches"
+            aria-label="Enabling this will validate if found product URLs via Google Search return any vital product information when passed to Polaris monitoring. This is going to slow workers down due to validating results, but it's good if you're finding a lot of invalid URLs via Google Search. Do note this will change 'Found Result' from True to False but it will keep invalidated URLs in the export. If Polaris is experiencing high blocking or high error rate for a certain domain enabling this can throw away valid matches"
+          >
+            <Info size={14} />
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="checkbox"
+              disabled={true}
+              checked={allowMultipleFoundURLs}
+              onChange={(e) => setAllowMultipleFoundURLs(e.target.checked)}
+            />
+            <span>Allow multiple found URLs</span>
+          </label>
+          <span
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+            title="Enabling this will allow multiple Found URLs in the export. FoundURL1, FoundURL2, FoundURL3, etc... This doesn't slow down the jobs, but usually results after first one is inaccurate use with caution."
+            aria-label="Enabling this will allow multiple Found URLs in the export. FoundURL1, FoundURL2, FoundURL3, etc... This doesn't slow down the jobs, but usually results after first one is inaccurate use with caution."
           >
             <Info size={14} />
           </span>
