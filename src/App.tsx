@@ -351,7 +351,6 @@ export default function App() {
 
   const [showModelStats, setShowModelStats] = useState(false);
 
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
@@ -533,7 +532,9 @@ export default function App() {
         />
       </div>
 
-      <footer className='container my-10 text-center text-sm text-slate-500 dark:text-slate-400'>Gemini Based Completeness</footer>
+      <footer className="container my-10 text-center text-sm text-slate-500 dark:text-slate-400">
+        Gemini Based Completeness
+      </footer>
 
       <ModelStatsModal open={showModelStats} onClose={() => setShowModelStats(false)} />
     </div>
@@ -1356,7 +1357,6 @@ function QueueTable({
   );
   const [renameTarget, setRenameTarget] = useState<Job | null>(null);
 
-
   const [statsJob, setStatsJob] = useState<Job | null>(null);
   const [jobStats, setJobStats] = useState<JobStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -1371,31 +1371,28 @@ function QueueTable({
     setStatsLoading(false);
   }, []);
 
-  const fetchJobStats = useCallback(
-    async (jobId: string, resetData: boolean) => {
-      const seq = ++statsRequestSeq.current;
-      setStatsLoading(true);
-      setStatsError(null);
-      if (resetData) {
-        setJobStats(null);
+  const fetchJobStats = useCallback(async (jobId: string, resetData: boolean) => {
+    const seq = ++statsRequestSeq.current;
+    setStatsLoading(true);
+    setStatsError(null);
+    if (resetData) {
+      setJobStats(null);
+    }
+    try {
+      const res = await api.jobStats(jobId);
+      if (statsRequestSeq.current === seq) {
+        setJobStats(res);
       }
-      try {
-        const res = await api.jobStats(jobId);
-        if (statsRequestSeq.current === seq) {
-          setJobStats(res);
-        }
-      } catch (err: any) {
-        if (statsRequestSeq.current === seq) {
-          setStatsError(String(err?.message || err));
-        }
-      } finally {
-        if (statsRequestSeq.current === seq) {
-          setStatsLoading(false);
-        }
+    } catch (err: any) {
+      if (statsRequestSeq.current === seq) {
+        setStatsError(String(err?.message || err));
       }
-    },
-    [],
-  );
+    } finally {
+      if (statsRequestSeq.current === seq) {
+        setStatsLoading(false);
+      }
+    }
+  }, []);
 
   const statsJobId = statsJob?.id;
 
@@ -2291,15 +2288,14 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
 
   const displayName = stats?.jobName || jobName;
 
-  const formatInt = (value: number) =>
-    Number.isFinite(value) ? value.toLocaleString() : '-';
-  const formatDecimal = (value: number) =>
-    Number.isFinite(value)
-      ? value.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })
-      : '-';
+  const formatInt = (value: number) => (Number.isFinite(value) ? value.toLocaleString() : '-');
+  // const formatDecimal = (value: number) =>
+  //   Number.isFinite(value)
+  //     ? value.toLocaleString(undefined, {
+  //         minimumFractionDigits: 2,
+  //         maximumFractionDigits: 2,
+  //       })
+  //     : '-';
   const formatPercent = (value: number) =>
     Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : '-';
 
@@ -2390,13 +2386,21 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                         <td className="px-3 py-2 align-top font-medium">{row.domain || 'N/A'}</td>
                         <td className="px-3 py-2 align-top text-right">{formatInt(row.catalog)}</td>
                         <td className="px-3 py-2 align-top text-right">{formatInt(row.matched)}</td>
-                        <td className="px-3 py-2 align-top text-right">{formatInt(row.unmatched)}</td>
+                        <td className="px-3 py-2 align-top text-right">
+                          {formatInt(row.unmatched)}
+                        </td>
                         <td className="px-3 py-2 align-top text-right">{formatInt(row.sampled)}</td>
                         <td className="px-3 py-2 align-top text-right">{formatInt(row.found)}</td>
-                        <td className="px-3 py-2 align-top text-right">{formatPercent(row.dqMr)}</td>
-                        <td className="px-3 py-2 align-top text-right">{formatDecimal(row.potentialMatches)}</td>
                         <td className="px-3 py-2 align-top text-right">
-                          <span className={completenessClasses}>{formatPercent(row.completeness)}</span>
+                          {formatPercent(row.dqMr)}
+                        </td>
+                        <td className="px-3 py-2 align-top text-right">
+                          {formatInt(row.potentialMatches)}
+                        </td>
+                        <td className="px-3 py-2 align-top text-right">
+                          <span className={completenessClasses}>
+                            {formatPercent(row.completeness)}
+                          </span>
                         </td>
                       </tr>
                     );
@@ -2551,23 +2555,6 @@ function RowActions({
                 <FileDown size={14} className="mr-2" /> Export
               </button>
             </li>
-
-            <li>
-              <button
-                className="menu-item disabled:opacity-50"
-                onClick={() => {
-                  if (!canShowStats) return;
-                  setOpen(false);
-                  onShowStats();
-                }}
-                disabled={!canShowStats}
-                title={
-                  canShowStats ? undefined : 'Stats available after some tasks are processed'
-                }
-              >
-                <BarChart3 size={14} className="mr-2" /> Show stats
-              </button>
-            </li>
             <li>
               <button
                 disabled={['running', 'pausing'].includes(job.status)}
@@ -2658,17 +2645,35 @@ function RowActions({
     : null;
 
   return (
-    <div className="relative">
+    <div className="flex items-center gap-2">
       <button
-        ref={btnRef}
-        className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-        onClick={openMenu}
-        aria-label="Actions"
-        title={menuDisabledTip}
+        className={clsx(
+          'inline-flex h-8 items-center gap-2 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 text-xs font-medium transition-colors hover:bg-slate-100 dark:hover:bg-slate-800',
+          !canShowStats && 'opacity-50 cursor-not-allowed'
+        )}
+        onClick={() => {
+          if (!canShowStats) return;
+          onShowStats();
+        }}
+        disabled={!canShowStats}
+        aria-label="Show stats"
+        title={canShowStats ? 'Show stats' : 'Stats available after some tasks are processed'}
       >
-        <MoreVertical size={16} />
+        <BarChart3 size={14} />
+        <span>Show stats</span>
       </button>
-      {PortalMenu}
+      <div className="relative">
+        <button
+          ref={btnRef}
+          className="inline-flex h-8 w-8 items-center justify-center rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          onClick={openMenu}
+          aria-label="More actions"
+          title={menuDisabledTip}
+        >
+          <MoreVertical size={16} />
+        </button>
+        {PortalMenu}
+      </div>
     </div>
   );
 }
@@ -2805,31 +2810,3 @@ function PriorityCell({
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
