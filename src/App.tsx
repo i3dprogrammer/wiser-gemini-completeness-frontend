@@ -728,6 +728,7 @@ function UploadCard({
   const [validate, setValidate] = useState(false);
   const [validateGoogleMatches, setValidateGoogleMatches] = useState(false);
   const [allowMultipleFoundURLs, setAllowMultipleFoundURLs] = useState(false);
+  const [skipGoogleSearch, setSkipGoogleSearch] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Mapping (union of keys across all files) + history
@@ -902,6 +903,7 @@ function UploadCard({
         fd.set('validate_images', String(validate));
         fd.set('validate_google_matches_via_polaris', String(validateGoogleMatches));
         fd.set('allow_multiple_found_urls', String(allowMultipleFoundURLs));
+        fd.set('skip_google_search', String(skipGoogleSearch));
         fd.set('worker_concurrency', String(50));
         fd.set('file', entry.file);
         fd.set('mapping', JSON.stringify(mapping));
@@ -930,6 +932,7 @@ function UploadCard({
       setValidate(false);
       setValidateGoogleMatches(false);
       setAllowMultipleFoundURLs(false);
+      setSkipGoogleSearch(false);
       setMapping({});
       setQueueMode('priority');
       setPriority(5);
@@ -1059,6 +1062,24 @@ function UploadCard({
             className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
             title="Enabling this will allow multiple Found URLs in the export. FoundURL1, FoundURL2, FoundURL3, etc... This doesn't slow down the jobs, but usually results after first one is inaccurate use with caution."
             aria-label="Enabling this will allow multiple Found URLs in the export. FoundURL1, FoundURL2, FoundURL3, etc... This doesn't slow down the jobs, but usually results after first one is inaccurate use with caution."
+          >
+            <Info size={14} />
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="checkbox"
+              checked={skipGoogleSearch}
+              onChange={(e) => setSkipGoogleSearch(e.target.checked)}
+            />
+            <span>Skip Google Search</span>
+          </label>
+          <span
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/40 focus:ring-offset-1 dark:border-slate-700 dark:text-slate-300 dark:hover:text-slate-100"
+            title="Enabling this will skip Google Search agent and go directly to Polaris Domain Search. Useful if Google Search is finding bad/oos matches"
+            aria-label="Enabling this will skip Google Search agent and go directly to Polaris Domain Search. Useful if Google Search is finding bad/oos matches"
           >
             <Info size={14} />
           </span>
@@ -2488,14 +2509,24 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                             key={row.domain}
                             className="border-b border-slate-200 dark:border-slate-700 last:border-b-0"
                           >
-                            <td className="px-3 py-2 align-top font-medium">{row.domain || 'N/A'}</td>
-                            <td className="px-3 py-2 align-top text-right">{formatInt(row.catalog)}</td>
-                            <td className="px-3 py-2 align-top text-right">{formatInt(row.matched)}</td>
+                            <td className="px-3 py-2 align-top font-medium">
+                              {row.domain || 'N/A'}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.catalog)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.matched)}
+                            </td>
                             <td className="px-3 py-2 align-top text-right">
                               {formatInt(row.unmatched)}
                             </td>
-                            <td className="px-3 py-2 align-top text-right">{formatInt(row.sampled)}</td>
-                            <td className="px-3 py-2 align-top text-right">{formatInt(row.found)}</td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.sampled)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.found)}
+                            </td>
                             <td className="px-3 py-2 align-top text-right">
                               {formatPercent(row.dqMr)}
                             </td>
@@ -2514,7 +2545,9 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                   </table>
                 </div>
               ) : (
-                <div className="py-10 text-center text-sm text-slate-500">No stats available yet.</div>
+                <div className="py-10 text-center text-sm text-slate-500">
+                  No stats available yet.
+                </div>
               )}
 
               {summary && (
@@ -2522,36 +2555,68 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                   <div className="text-sm font-semibold mb-3">Job totals</div>
                   <dl className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Created</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDateTime(summary.createdAt)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Created
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatDateTime(summary.createdAt)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Started</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDateTime(summary.startedAt)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Started
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatDateTime(summary.startedAt)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Finished</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDateTime(summary.finishedAt)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Finished
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatDateTime(summary.finishedAt)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total time</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatDuration(summary.totalDurationSeconds)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Total time
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatDuration(summary.totalDurationSeconds)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total cost</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatCost(summary.totalCost)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Total cost
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatCost(summary.totalCost)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Total Gemini requests</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatInt(summary.totalGeminiRequests)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Total Gemini requests
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatInt(summary.totalGeminiRequests)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Found via Google</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatInt(summary.foundViaGoogle)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Found via Google
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatInt(summary.foundViaGoogle)}
+                      </dd>
                     </div>
                     <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Found via Polaris</dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">{formatInt(summary.foundViaPolaris)}</dd>
+                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Found via Polaris
+                      </dt>
+                      <dd className="text-sm text-slate-900 dark:text-slate-100">
+                        {formatInt(summary.foundViaPolaris)}
+                      </dd>
                     </div>
                   </dl>
                 </div>
@@ -2958,4 +3023,3 @@ function PriorityCell({
     </>
   );
 }
-
