@@ -55,6 +55,7 @@ type StatusKey = (typeof STATUS_LIST)[number];
 const LS_OWNERS = 'ownerFilter';
 const LS_STATUSES = 'statusFilter';
 const LS_PRIOS = 'prioFilter';
+const LS_HIDE_COMPLETED = 'hideCompletedJobs';
 const LS_MAP_HISTORY = 'mapping_history_v1';
 const LS_PAGE_SIZE = 'jobsPageSize';
 
@@ -309,6 +310,7 @@ export default function App() {
   const [ownerFilter, setOwnerFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusKey[]>([]);
   const [prioFilter, setPrioFilter] = useState<number[]>([]);
+  const [hideCompleted, setHideCompleted] = useState(false);
   // Free search (not persisted)
   const [q, setQ] = useState('');
 
@@ -317,9 +319,11 @@ export default function App() {
       const o = JSON.parse(localStorage.getItem(LS_OWNERS) || '[]');
       const s = JSON.parse(localStorage.getItem(LS_STATUSES) || '[]');
       const p = JSON.parse(localStorage.getItem(LS_PRIOS) || '[]');
+      const hide = localStorage.getItem(LS_HIDE_COMPLETED);
       setOwnerFilter(Array.isArray(o) ? o : []);
       setStatusFilter(Array.isArray(s) ? s : []);
       setPrioFilter(Array.isArray(p) ? p : []);
+      setHideCompleted(hide === '1' || hide === 'true');
     } catch {}
   }, []);
   useEffect(() => {
@@ -337,6 +341,12 @@ export default function App() {
       localStorage.setItem(LS_PRIOS, JSON.stringify(prioFilter));
     } catch {}
   }, [prioFilter]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_HIDE_COMPLETED, hideCompleted ? '1' : '0');
+    } catch {}
+  }, [hideCompleted]);
 
   // Toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -426,6 +436,8 @@ export default function App() {
           setStatusFilter={setStatusFilter}
           prioFilter={prioFilter}
           setPrioFilter={setPrioFilter}
+          hideCompleted={hideCompleted}
+          setHideCompleted={setHideCompleted}
           pushToast={pushToast}
           onReorder={async (ids) => {
             try {
@@ -1363,6 +1375,8 @@ function QueueTable({
   setStatusFilter,
   prioFilter,
   setPrioFilter,
+  hideCompleted,
+  setHideCompleted,
   onReorder,
   onPause,
   onResume,
@@ -1384,6 +1398,8 @@ function QueueTable({
   setStatusFilter: React.Dispatch<React.SetStateAction<StatusKey[]>>;
   prioFilter: number[];
   setPrioFilter: React.Dispatch<React.SetStateAction<number[]>>;
+  hideCompleted: boolean;
+  setHideCompleted: React.Dispatch<React.SetStateAction<boolean>>;
   onReorder: (ids: string[]) => Promise<void>;
   onPause: (id: string) => Promise<void>;
   onResume: (id: string) => Promise<void>;
@@ -1408,7 +1424,7 @@ function QueueTable({
       localStorage.setItem(LS_PAGE_SIZE, String(pageSize));
     } catch {}
   }, [pageSize]);
-  useEffect(() => setPage(1), [q, ownerFilter, statusFilter, prioFilter]);
+  useEffect(() => setPage(1), [q, ownerFilter, statusFilter, prioFilter, hideCompleted]);
 
   const [prioOverrides, setPrioOverrides] = useState<Record<string, number>>({});
   const getPrio = (j: Job) => (j.id in prioOverrides ? prioOverrides[j.id] : (j.priority ?? 5));
@@ -1439,6 +1455,11 @@ function QueueTable({
     } else setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
   };
   const isManual = sortKey === 'manual';
+  const searchActive = q.trim().length > 0;
+  const filtersApplied =
+    ownerFilter.length > 0 || statusFilter.length > 0 || prioFilter.length > 0 || searchActive;
+  const filtersActive = filtersApplied || hideCompleted;
+  const manualReorderEnabled = isManual && !filtersActive;
 
   const ownerOptions = useMemo(() => Array.from(new Set(jobs.map((j) => j.owner))).sort(), [jobs]);
   const existingNameSet = useMemo(
@@ -1518,6 +1539,7 @@ function QueueTable({
       const ownerOk = ownerFilter.length === 0 || ownerFilter.includes(j.owner);
       const statusOk = statusFilter.length === 0 || statusFilter.includes(j.status as StatusKey);
       const prioOk = prioFilter.length === 0 || prioFilter.includes(getPrio(j));
+      const hideOk = !hideCompleted || j.status !== 'completed';
 
       const haystack = [
         j.name,
@@ -1532,9 +1554,9 @@ function QueueTable({
 
       const qOk = !qn || qParts.length === 0 || qParts.every((part) => haystack.includes(part));
 
-      return ownerOk && statusOk && prioOk && qOk;
+      return ownerOk && statusOk && prioOk && hideOk && qOk;
     });
-  }, [jobs, ownerFilter, statusFilter, prioFilter, q]);
+  }, [jobs, ownerFilter, statusFilter, prioFilter, q, hideCompleted]);
 
   const completedVisibleJobs = useMemo(
     () => filteredAll.filter((j) => j.status === 'completed').length,
@@ -1675,7 +1697,7 @@ function QueueTable({
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const pageIds = paged.map((r) => r.id);
   const onDragEnd = (event: any) => {
-    if (!isManual) return;
+    if (!manualReorderEnabled) return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const a = rows.findIndex((r) => r.id === active.id);
@@ -1690,7 +1712,7 @@ function QueueTable({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   useEffect(() => {
     setSelectedIds([]);
-  }, [ownerFilter, statusFilter, prioFilter, q, pageSize]);
+  }, [ownerFilter, statusFilter, prioFilter, q, pageSize, hideCompleted]);
   const selected = new Set(selectedIds);
   const allFilteredIds = filteredAll.map((r) => r.id);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => selected.has(id));
@@ -1731,6 +1753,7 @@ function QueueTable({
 
   // ordering helpers (manual only)
   const toTop = async (id: string) => {
+    if (!manualReorderEnabled) return;
     const nextOrderIds = [id, ...rows.filter((r) => r.id !== id).map((r) => r.id)];
     setRows((prev) => {
       const job = prev.find((j) => j.id === id);
@@ -1749,7 +1772,7 @@ function QueueTable({
     lastServerOrderRef.current = nextOrderIds;
   };
   const moveUp = (id: string) => {
-    if (!isManual) return;
+    if (!manualReorderEnabled) return;
     const i = rows.findIndex((r) => r.id === id);
     if (i <= 0) return;
     const next = arrayMove(rows, i, i - 1);
@@ -1757,7 +1780,7 @@ function QueueTable({
     setDirty(true);
   };
   const moveDown = (id: string) => {
-    if (!isManual) return;
+    if (!manualReorderEnabled) return;
     const i = rows.findIndex((r) => r.id === id);
     if (i === -1 || i === rows.length - 1) return;
     const next = arrayMove(rows, i, i + 1);
@@ -1765,6 +1788,7 @@ function QueueTable({
     setDirty(true);
   };
   const saveOrder = async () => {
+    if (!manualReorderEnabled) return;
     const order = rows.map((r) => r.id);
     try {
       await onReorder(order);
@@ -1773,8 +1797,7 @@ function QueueTable({
       lastServerOrderRef.current = order;
     }
   };
-  const orderChanged =
-    isManual && rows.map((j) => j.id).join('|') !== lastServerOrderRef.current.join('|');
+  const hasOrderChanged = rows.map((j) => j.id).join('|') !== lastServerOrderRef.current.join('|');
 
   // row coloring
   const rowHue = (s: StatusKey) => {
@@ -1965,6 +1988,15 @@ function QueueTable({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm">View:</span>
+          <Chip
+            checked={hideCompleted}
+            label="Hide Completed"
+            onChange={(on) => setHideCompleted(on)}
+          />
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm">Priority:</span>
           <div className="flex flex-wrap gap-2">
             {[1, 2, 3, 4, 5].map((p) => (
@@ -2022,7 +2054,9 @@ function QueueTable({
 
           <div className="ml-3 text-xs text-slate-500 hidden sm:block">
             {isManual
-              ? 'Drag rows to reorder.'
+              ? manualReorderEnabled
+                ? 'Drag rows to reorder.'
+                : 'Clear filters or disable Hide Completed to reorder.'
               : `Sorted by ${sortKey} (${sortDir}). Disable sorting to drag.`}
           </div>
         </div>
@@ -2031,12 +2065,18 @@ function QueueTable({
           <button
             className={clsx(
               'inline-flex items-center gap-1 px-2 py-1 rounded border text-sm',
-              isManual && orderChanged
+              manualReorderEnabled && hasOrderChanged
                 ? 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
                 : 'opacity-50 cursor-not-allowed bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'
             )}
-            onClick={isManual && orderChanged ? saveOrder : undefined}
-            title={isManual ? 'Save manual order' : 'Disable sorting to save manual order'}
+            onClick={manualReorderEnabled && hasOrderChanged ? saveOrder : undefined}
+            title={!isManual
+              ? 'Disable sorting to save manual order'
+              : filtersActive
+                ? 'Clear filters or disable Hide Completed to save order'
+                : hasOrderChanged
+                  ? 'Save manual order'
+                  : 'No changes to save'}
           >
             Save Order
           </button>
@@ -2102,7 +2142,7 @@ function QueueTable({
                       key={j.id}
                       id={j.id}
                       hueClass={clsx(hue, isSelected && 'ring-2 ring-brand-600/50')}
-                      dndEnabled={isManual}
+                      dndEnabled={manualReorderEnabled}
                     >
                       {(dragListeners: any) => (
                         <>
@@ -2121,12 +2161,16 @@ function QueueTable({
                               <button
                                 className={clsx(
                                   'inline-flex items-center justify-center h-7 w-7 rounded border border-slate-300 dark:border-slate-700',
-                                  isManual
+                                  manualReorderEnabled
                                     ? 'text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900'
                                     : 'opacity-40 cursor-not-allowed'
                                 )}
-                                title={isManual ? 'Drag to reorder' : 'Disable sorting to drag'}
-                                {...(isManual ? dragListeners : {})}
+                                title={manualReorderEnabled
+                                  ? 'Drag to reorder'
+                                  : !isManual
+                                    ? 'Disable sorting to drag'
+                                    : 'Clear filters or disable Hide Completed to reorder'}
+                                {...(manualReorderEnabled ? dragListeners : {})}
                               >
                                 ≡
                               </button>
@@ -2243,11 +2287,15 @@ function QueueTable({
                               }
                               onShowStats={() => handleShowStats(j)}
                               onExport={() => onExport(j.id)}
-                              onTop={() => (isManual ? toTop(j.id) : undefined)}
-                              onUp={() => (isManual ? moveUp(j.id) : undefined)}
-                              onDown={() => (isManual ? moveDown(j.id) : undefined)}
+                              onTop={() => (manualReorderEnabled ? toTop(j.id) : undefined)}
+                              onUp={() => (manualReorderEnabled ? moveUp(j.id) : undefined)}
+                              onDown={() => (manualReorderEnabled ? moveDown(j.id) : undefined)}
                               menuDisabledTip={
-                                !isManual ? 'Move actions disabled while sorted' : undefined
+                                manualReorderEnabled
+                                  ? undefined
+                                  : !isManual
+                                    ? 'Move actions disabled while sorted'
+                                    : 'Clear filters or disable Hide Completed to move'
                               }
                             />
                           </td>
