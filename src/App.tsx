@@ -380,22 +380,22 @@ export default function App() {
 
       {/* Top bar */}
       <div className="sticky top-0 z-10 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800">
-        <div className="container flex items-center justify-between py-3">
+        <div className="container relative flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" className="h-6 w-6" />
             <div className="font-semibold">Gemini Based Completeness</div>
           </div>
 
-          <div className="flex-1 flex justify-center">
-            {announcementMessage && (
+          {announcementMessage && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-center">
               <div
-                className="inline-flex items-center justify-center px-4 py-1.5 rounded-md border text-sm text-center bg-amber-200/90 text-amber-950 border-amber-300 shadow-sm dark:bg-amber-300/25 dark:border-amber-400/60 dark:text-amber-100"
+                className="inline-flex items-center justify-center px-4 py-1.5 rounded-md border text-sm text-center bg-amber-200/90 text-amber-950 border-amber-300 shadow-sm dark:bg-amber-300/25 dark:border-amber-400/60 dark:text-amber-100 pointer-events-auto"
                 title={announcementTooltip}
               >
                 {announcementMessage}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -3087,3 +3087,4 @@ function PriorityCell({
     </>
   );
 }
+
