@@ -44,8 +44,8 @@ export type ListJobsResponse = {
 };
 
 type RawListJobsResponse = {
-  jobs: Job[];
-  quota_announcement: RawQuotaAnnouncement | null;
+  jobs?: Job[];
+  quota_announcement?: RawQuotaAnnouncement | null;
 };
 
 export type Progress = {
@@ -135,18 +135,26 @@ export const api = {
     const params = new URLSearchParams();
     if (onlyMine) params.set('only_mine', 'true');
     if (status) params.set('status', status);
-    const res = await json<RawListJobsResponse>(await fetch(`/api/jobs?${params.toString()}`));
-    return {
-      jobs: res.jobs,
-      quotaAnnouncement: res.quota_announcement
+
+    const raw = await json<RawListJobsResponse | Job[]>(await fetch(`/api/jobs?${params.toString()}`));
+
+    if (Array.isArray(raw)) {
+      return { jobs: raw, quotaAnnouncement: null };
+    }
+
+    const jobs = Array.isArray(raw.jobs) ? raw.jobs : [];
+    const quota = raw.quota_announcement;
+    const quotaAnnouncement =
+      quota && typeof quota === 'object'
         ? {
-            limitType: res.quota_announcement.limit_type,
-            hitAt: res.quota_announcement.hit_at,
-            resetAt: res.quota_announcement.reset_at,
-            message: res.quota_announcement.message,
+            limitType: quota.limit_type,
+            hitAt: quota.hit_at,
+            resetAt: quota.reset_at,
+            message: quota.message,
           }
-        : null,
-    };
+        : null;
+
+    return { jobs, quotaAnnouncement };
   },
 
   async reorder(ids: string[]) {
@@ -266,6 +274,7 @@ export const api = {
     return json(await fetch('/api/stats/models'));
   },
 };
+
 
 
 
