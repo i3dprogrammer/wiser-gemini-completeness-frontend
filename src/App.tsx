@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './lib/api';
-import type { Job, Progress, JobStats } from './lib/api';
+import type { Job, Progress, JobStats, ListJobsResponse } from './lib/api';
 import {
   Pause,
   Play,
@@ -293,7 +293,7 @@ function RenameJobDialog({
 /* ----------------------------- Data Fetching ----------------------------- */
 
 function useJobs() {
-  return useQuery({
+  return useQuery<ListJobsResponse>({
     queryKey: ['jobs'],
     queryFn: () => api.listJobs(false, ''),
     refetchInterval: 5000,
@@ -304,7 +304,9 @@ function useJobs() {
 
 export default function App() {
   const qc = useQueryClient();
-  const { data: jobs = [], isFetching } = useJobs();
+  const { data: jobData, isFetching } = useJobs();
+  const jobs = jobData?.jobs ?? [];
+  const quotaAnnouncement = jobData?.quotaAnnouncement ?? null;
 
   // Filters (persisted)
   const [ownerFilter, setOwnerFilter] = useState<string[]>([]);
@@ -357,7 +359,18 @@ export default function App() {
     setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500);
   };
 
-  const [announcement] = useState<string | null>(null);
+  const announcementMessage = quotaAnnouncement?.message ?? null;
+
+  const announcementTooltip = useMemo(() => {
+    if (!quotaAnnouncement?.resetAt) return undefined;
+    try {
+      const resetLocal = new Date(quotaAnnouncement.resetAt).toLocaleString();
+      const hitLocal = quotaAnnouncement.hitAt ? new Date(quotaAnnouncement.hitAt).toLocaleString() : null;
+      return hitLocal ? `Triggered ${hitLocal} - Resets ${resetLocal}` : `Resets ${resetLocal}`;
+    } catch {
+      return `Resets ${quotaAnnouncement.resetAt}`;
+    }
+  }, [quotaAnnouncement]);
 
   const [showModelStats, setShowModelStats] = useState(false);
 
@@ -374,9 +387,12 @@ export default function App() {
           </div>
 
           <div className="flex-1 flex justify-center">
-            {announcement && (
-              <div className="px-3 py-1 rounded-md border bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm">
-                {announcement}
+            {announcementMessage && (
+              <div
+                className="px-3 py-1 rounded-md border bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm"
+                title={announcementTooltip}
+              >
+                {announcementMessage}
               </div>
             )}
           </div>

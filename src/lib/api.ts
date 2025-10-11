@@ -24,6 +24,30 @@ export type Job = {
   matches_found?: number;
 };
 
+export type QuotaAnnouncement = {
+  limitType: 'PerMinute' | 'PerDay';
+  hitAt: string;
+  resetAt: string;
+  message: string;
+};
+
+type RawQuotaAnnouncement = {
+  limit_type: QuotaAnnouncement['limitType'];
+  hit_at: string;
+  reset_at: string;
+  message: string;
+};
+
+export type ListJobsResponse = {
+  jobs: Job[];
+  quotaAnnouncement: QuotaAnnouncement | null;
+};
+
+type RawListJobsResponse = {
+  jobs: Job[];
+  quota_announcement: RawQuotaAnnouncement | null;
+};
+
 export type Progress = {
   pending: number;
   processing: number;
@@ -107,11 +131,22 @@ const json = async <T = any>(res: Response): Promise<T> => {
 };
 
 export const api = {
-  async listJobs(onlyMine: boolean, status: string): Promise<Job[]> {
+  async listJobs(onlyMine: boolean, status: string): Promise<ListJobsResponse> {
     const params = new URLSearchParams();
     if (onlyMine) params.set('only_mine', 'true');
     if (status) params.set('status', status);
-    return json(await fetch(`/api/jobs?${params.toString()}`));
+    const res = await json<RawListJobsResponse>(await fetch(`/api/jobs?${params.toString()}`));
+    return {
+      jobs: res.jobs,
+      quotaAnnouncement: res.quota_announcement
+        ? {
+            limitType: res.quota_announcement.limit_type,
+            hitAt: res.quota_announcement.hit_at,
+            resetAt: res.quota_announcement.reset_at,
+            message: res.quota_announcement.message,
+          }
+        : null,
+    };
   },
 
   async reorder(ids: string[]) {
