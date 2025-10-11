@@ -389,7 +389,7 @@ export default function App() {
           <div className="flex-1 flex justify-center">
             {announcementMessage && (
               <div
-                className="px-3 py-1 rounded-md border bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-sm"
+                className="inline-flex items-center justify-center px-4 py-1.5 rounded-md border text-sm text-center bg-amber-200/90 text-amber-950 border-amber-300 shadow-sm dark:bg-amber-300/25 dark:border-amber-400/60 dark:text-amber-100"
                 title={announcementTooltip}
               >
                 {announcementMessage}
