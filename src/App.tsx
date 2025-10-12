@@ -2554,6 +2554,9 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                           Sampled
                         </th>
                         <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                          Processed
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
                           Found
                         </th>
                         <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
@@ -2595,6 +2598,9 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                             </td>
                             <td className="px-3 py-2 align-top text-right">
                               {formatInt(row.sampled)}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {formatInt(row.processed)}
                             </td>
                             <td className="px-3 py-2 align-top text-right">
                               {formatInt(row.found)}

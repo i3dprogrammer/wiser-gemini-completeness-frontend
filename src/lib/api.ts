@@ -74,6 +74,7 @@ export type JobDomainStat = {
   matched: number;
   unmatched: number;
   sampled: number;
+  processed: number;
   found: number;
   dqMr: number;
   potentialMatches: number;
@@ -222,6 +223,7 @@ export const api = {
         matched: d.matched,
         unmatched: d.unmatched,
         sampled: d.sampled,
+        processed: d.processed,
         found: d.found,
         dqMr: d.dq_mr,
         potentialMatches: d.potential_matches,
