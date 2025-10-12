@@ -2494,7 +2494,7 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
   return createPortal(
     <div className="fixed inset-0 z-[1100] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-[min(960px,94vw)] max-h-[85vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
+      <div className="relative z-10 w-[min(1040px,96vw)] max-h-[85vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
           <div>
             <div className="text-lg font-semibold">Job stats</div>
