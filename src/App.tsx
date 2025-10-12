@@ -365,7 +365,9 @@ export default function App() {
     if (!quotaAnnouncement?.resetAt) return undefined;
     try {
       const resetLocal = new Date(quotaAnnouncement.resetAt).toLocaleString();
-      const hitLocal = quotaAnnouncement.hitAt ? new Date(quotaAnnouncement.hitAt).toLocaleString() : null;
+      const hitLocal = quotaAnnouncement.hitAt
+        ? new Date(quotaAnnouncement.hitAt).toLocaleString()
+        : null;
       return hitLocal ? `Triggered ${hitLocal} - Resets ${resetLocal}` : `Resets ${resetLocal}`;
     } catch {
       return `Resets ${quotaAnnouncement.resetAt}`;
@@ -1579,23 +1581,25 @@ function QueueTable({
     [filteredAll]
   );
   const pendingVisibleJobs = useMemo(
-    () => filteredAll.filter((j) => j.status === 'queued' || j.status === 'running').length,
+    () =>
+      filteredAll.filter((j) => ['queued', 'running', 'paused', 'pausing'].includes(j.status))
+        .length,
     [filteredAll]
   );
 
   const completedVisibleTasks = useMemo(
     () =>
-      filteredAll.reduce(
-        (sum, item) => sum + item.processed_rows + (item.error_rows ? item.error_rows : 0),
-        0
-      ),
+      filteredAll.reduce((sum, j) => sum + j.processed_rows + (j.error_rows ? j.error_rows : 0), 0),
     [filteredAll]
   );
   const pendingVisibleTasks = useMemo(
     () =>
       filteredAll.reduce(
-        (sum, item) =>
-          sum + (item.total_rows - (item.processed_rows + (item.error_rows ? item.error_rows : 0))),
+        (sum, j) =>
+          sum +
+          (['canceled', 'failed'].includes(j.status)
+            ? 0
+            : j.total_rows - (j.processed_rows + (j.error_rows ? j.error_rows : 0))),
         0
       ),
     [filteredAll]
@@ -2086,13 +2090,15 @@ function QueueTable({
                 : 'opacity-50 cursor-not-allowed bg-slate-200 dark:bg-slate-800 text-slate-500 border-slate-300 dark:border-slate-700'
             )}
             onClick={manualReorderEnabled && hasOrderChanged ? saveOrder : undefined}
-            title={!isManual
-              ? 'Disable sorting to save manual order'
-              : filtersActive
-                ? 'Clear filters or disable Hide Completed to save order'
-                : hasOrderChanged
-                  ? 'Save manual order'
-                  : 'No changes to save'}
+            title={
+              !isManual
+                ? 'Disable sorting to save manual order'
+                : filtersActive
+                  ? 'Clear filters or disable Hide Completed to save order'
+                  : hasOrderChanged
+                    ? 'Save manual order'
+                    : 'No changes to save'
+            }
           >
             Save Order
           </button>
@@ -2181,11 +2187,13 @@ function QueueTable({
                                     ? 'text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900'
                                     : 'opacity-40 cursor-not-allowed'
                                 )}
-                                title={manualReorderEnabled
-                                  ? 'Drag to reorder'
-                                  : !isManual
-                                    ? 'Disable sorting to drag'
-                                    : 'Clear filters or disable Hide Completed to reorder'}
+                                title={
+                                  manualReorderEnabled
+                                    ? 'Drag to reorder'
+                                    : !isManual
+                                      ? 'Disable sorting to drag'
+                                      : 'Clear filters or disable Hide Completed to reorder'
+                                }
                                 {...(manualReorderEnabled ? dragListeners : {})}
                               >
                                 ≡
@@ -3087,4 +3095,3 @@ function PriorityCell({
     </>
   );
 }
-
