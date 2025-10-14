@@ -1458,6 +1458,11 @@ function QueueTable({
     const mi = pad(d.getMinutes());
     return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
   };
+  const parseIsoTimestamp = (iso?: string | null) => {
+    if (!iso) return null;
+    const value = Date.parse(iso);
+    return Number.isNaN(value) ? null : value;
+  };
 
   // sorting
   const [sortKey, setSortKey] = useState<SortKey>('manual');
@@ -1629,15 +1634,24 @@ function QueueTable({
     if (isManual) return rows;
     const arr = [...filteredAll];
     const cmp = (a: Job, b: Job) => {
-      let av: any, bv: any;
+      let av: any = 0;
+      let bv: any = 0;
       switch (sortKey) {
         case 'name':
           av = a.name;
           bv = b.name;
           break;
         case 'created_at':
-          av = a.created_at || '';
-          bv = b.created_at || '';
+          av = parseIsoTimestamp(a.created_at);
+          bv = parseIsoTimestamp(b.created_at);
+          if (av === null && bv === null) {
+            av = 0;
+            bv = 0;
+          } else if (av === null) {
+            return sortDir === 'asc' ? 1 : -1;
+          } else if (bv === null) {
+            return sortDir === 'asc' ? -1 : 1;
+          }
           break;
         case 'status':
           av = a.status;
