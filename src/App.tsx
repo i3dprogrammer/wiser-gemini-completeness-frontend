@@ -781,6 +781,37 @@ function UploadCard({
   };
 
   // Helper: parse a single file -> ValidateSummary
+  const isValidDomain = (value: unknown): boolean => {
+    if (typeof value !== 'string') return false;
+    const raw = value.trim();
+    if (!raw) return false;
+
+    const ensureScheme = (input: string) =>
+      /^[a-z][a-z0-9+\-.]*:\/\//i.test(input) ? input : `https://${input}`;
+
+    let hostname = raw;
+    try {
+      const parsed = new URL(ensureScheme(raw));
+      hostname = parsed.hostname || raw;
+    } catch {
+      hostname = raw.replace(/^[a-z][a-z0-9+\-.]*:\/\//i, '').split('/')[0] || raw;
+    }
+
+    hostname = hostname
+      .replace(/\.$/, '')
+      .replace(/^www\./i, '')
+      .split(':')[0];
+    if (!hostname) return false;
+
+    const labels = hostname.split('.').filter(Boolean);
+    if (labels.length < 2) return false;
+
+    const tld = labels[labels.length - 1];
+    if (!/^[a-z]{2,}$/i.test(tld)) return false;
+
+    return true;
+  };
+
   const parseOne = async (f: File): Promise<ValidateSummary> => {
     try {
       const text = await f.text();
@@ -811,18 +842,30 @@ function UploadCard({
       for (const o of lines) {
         lineNum++;
         const ref = o?.referenceProduct?.referenceAttributes;
-        const tgt = o?.targetMerchant?.targetName || o?.targetMerchant?.targetHomepage;
+        const domainCandidates = [
+          o?.targetMerchant?.targetHomepage,
+          o?.targetMerchant?.targetName,
+        ].filter((d): d is string => typeof d === 'string' && d.trim().length > 0);
+        const primaryDomain = domainCandidates[0] || '';
         const hasKeys = ref && typeof ref === 'object' && Object.keys(ref).length > 0;
-        const hasTarget = typeof tgt === 'string' && tgt.trim().length > 0;
-        if (hasKeys && hasTarget) {
+        const hasTarget = domainCandidates.length > 0;
+        const hasValidDomain = domainCandidates.some(isValidDomain);
+
+        if (hasKeys && hasTarget && hasValidDomain) {
           valid++;
           Object.keys(ref).forEach((k) => keySet.add(k));
         } else {
           invalid++;
           if (invalidSamples.length < 5) {
-            const reason = !hasKeys
-              ? 'Missing referenceAttributes keys [line ' + lineNum + ']'
-              : 'Missing targetName/homepage [line ' + lineNum + ']';
+            let reason: string;
+            if (!hasKeys) {
+              reason = 'Missing referenceAttributes keys [line ' + lineNum + ']';
+            } else if (!hasTarget) {
+              reason = 'Missing targetName/homepage [line ' + lineNum + ']';
+            } else {
+              const sample = primaryDomain ? `: ${JSON.stringify(primaryDomain.trim())}` : '';
+              reason = `Invalid domain (missing TLD) [line ${lineNum}]${sample}`;
+            }
             invalidSamples.push(reason);
           }
         }
