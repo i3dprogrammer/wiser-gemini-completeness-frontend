@@ -59,6 +59,9 @@ const LS_HIDE_COMPLETED = 'hideCompletedJobs';
 const LS_MAP_HISTORY = 'mapping_history_v1';
 const LS_PAGE_SIZE = 'jobsPageSize';
 
+const MAX_TASKS_PER_FILE = 40_000;
+const DISALLOWED_DOMAIN_SUBSTRING = 'epaa.360pi.com';
+
 type SortKey = 'manual' | 'name' | 'created_at' | 'status' | 'priority';
 type SortDir = 'asc' | 'desc';
 
@@ -781,13 +784,13 @@ function UploadCard({
   };
 
   // Helper: parse a single file -> ValidateSummary
-  const isValidDomain = (value: unknown): boolean => {
-    if (typeof value !== 'string') return false;
-    const raw = value.trim();
-    if (!raw) return false;
+  const ensureScheme = (input: string) =>
+    /^[a-z][a-z0-9+\-.]*:\/\//i.test(input) ? input : `https://${input}`;
 
-    const ensureScheme = (input: string) =>
-      /^[a-z][a-z0-9+\-.]*:\/\//i.test(input) ? input : `https://${input}`;
+  const extractHostname = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const raw = value.trim();
+    if (!raw) return null;
 
     let hostname = raw;
     try {
@@ -801,8 +804,12 @@ function UploadCard({
       .replace(/\.$/, '')
       .replace(/^www\./i, '')
       .split(':')[0];
-    if (!hostname) return false;
+    if (!hostname) return null;
 
+    return hostname;
+  };
+
+  const isValidHostname = (hostname: string): boolean => {
     const labels = hostname.split('.').filter(Boolean);
     if (labels.length < 2) return false;
 
@@ -834,6 +841,22 @@ function UploadCard({
         else lines.push(obj);
       }
 
+      if (lines.length > MAX_TASKS_PER_FILE) {
+        const total = lines.length;
+        return {
+          sizeBytes: f.size,
+          total,
+          valid: 0,
+          invalid: total,
+          invalidSamples: [
+            `File exceeds ${MAX_TASKS_PER_FILE.toLocaleString()} row limit (found ${total.toLocaleString()})`,
+          ],
+          uniqueRefKeys: [],
+        };
+      }
+
+      const disallowedSubstring = DISALLOWED_DOMAIN_SUBSTRING.toLowerCase();
+
       let valid = 0,
         invalid = 0;
       const invalidSamples: string[] = [];
@@ -845,25 +868,40 @@ function UploadCard({
         const domainCandidates = [
           o?.targetMerchant?.targetHomepage,
           o?.targetMerchant?.targetName,
-        ].filter((d): d is string => typeof d === 'string' && d.trim().length > 0);
+        ]
+          .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
+          .map((d) => d.trim());
         const primaryDomain = domainCandidates[0] || '';
+        const normalizedDomains = domainCandidates
+          .map((d) => extractHostname(d))
+          .filter((d): d is string => typeof d === 'string' && d.length > 0);
         const hasKeys = ref && typeof ref === 'object' && Object.keys(ref).length > 0;
         const hasTarget = domainCandidates.length > 0;
-        const hasValidDomain = domainCandidates.some(isValidDomain);
+        const hasValidDomain = normalizedDomains.some(isValidHostname);
+        const disallowedDomain = normalizedDomains.find((d) =>
+          d.toLowerCase().includes(disallowedSubstring)
+        );
+        const disallowedOriginal = domainCandidates.find((d) =>
+          d.toLowerCase().includes(disallowedSubstring)
+        );
 
-        if (hasKeys && hasTarget && hasValidDomain) {
+        if (hasKeys && hasTarget && hasValidDomain && !disallowedDomain) {
           valid++;
           Object.keys(ref).forEach((k) => keySet.add(k));
         } else {
           invalid++;
           if (invalidSamples.length < 5) {
             let reason: string;
-            if (!hasKeys) {
+            if (disallowedDomain || disallowedOriginal) {
+              const domainSample = disallowedDomain ?? disallowedOriginal ?? '';
+              const sample = domainSample ? `: ${JSON.stringify(domainSample)}` : '';
+              reason = `Disallowed domain (contains "${DISALLOWED_DOMAIN_SUBSTRING}") [line ${lineNum}]${sample}`;
+            } else if (!hasKeys) {
               reason = 'Missing referenceAttributes keys [line ' + lineNum + ']';
             } else if (!hasTarget) {
               reason = 'Missing targetName/homepage [line ' + lineNum + ']';
             } else {
-              const sample = primaryDomain ? `: ${JSON.stringify(primaryDomain.trim())}` : '';
+              const sample = primaryDomain ? `: ${JSON.stringify(primaryDomain)}` : '';
               reason = `Invalid domain (missing TLD) [line ${lineNum}]${sample}`;
             }
             invalidSamples.push(reason);
