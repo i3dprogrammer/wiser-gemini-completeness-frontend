@@ -1,5 +1,12 @@
 // src/App.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './lib/api';
@@ -61,6 +68,7 @@ const LS_PAGE_SIZE = 'jobsPageSize';
 
 const MAX_TASKS_PER_FILE = 100_000;
 const DISALLOWED_DOMAIN_SUBSTRING = 'epaa.360pi.com';
+const DEFAULT_HEADER_HEIGHT = 64;
 
 type SortKey = 'manual' | 'name' | 'created_at' | 'status' | 'priority';
 type SortDir = 'asc' | 'desc';
@@ -318,6 +326,30 @@ export default function App() {
   const [hideCompleted, setHideCompleted] = useState(false);
   // Free search (not persisted)
   const [q, setQ] = useState('');
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(DEFAULT_HEADER_HEIGHT);
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    const el = headerRef.current;
+    if (!el) return;
+    const update = () => {
+      setHeaderHeight(el.getBoundingClientRect().height);
+    };
+    update();
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => update());
+      observer.observe(el);
+    }
+    window.addEventListener('resize', update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  const stickyOffset = headerHeight + 8;
 
   useEffect(() => {
     try {
@@ -384,7 +416,10 @@ export default function App() {
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
 
       {/* Top bar */}
-      <div className="sticky top-0 z-10 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800">
+      <div
+        ref={headerRef}
+        className="sticky top-0 z-20 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800"
+      >
         <div className="container relative flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" className="h-6 w-6" />
@@ -410,6 +445,7 @@ export default function App() {
 
       <div className="container py-6 space-y-6">
         <UploadCard
+          stickyOffset={stickyOffset}
           existingNames={useMemo(
             () => new Set(jobs.map((j) => j.name.trim().toLowerCase())),
             [jobs]
@@ -734,11 +770,13 @@ function ModelStatsModal({ open, onClose }: { open: boolean; onClose: () => void
 // --- REPLACE JUST THE UploadCard COMPONENT BELOW IN YOUR FILE ---
 
 function UploadCard({
+  stickyOffset,
   onUploaded,
   existingNames,
   pushToast,
   onOpenModelStats,
 }: {
+  stickyOffset: number;
   onUploaded: (r: { job_id?: string; insertWhere?: InsertWhere }) => void;
   existingNames: Set<string>;
   pushToast: (t: Omit<Toast, 'id'>) => void;
@@ -763,6 +801,12 @@ function UploadCard({
   const [allowMultipleFoundURLs, setAllowMultipleFoundURLs] = useState(false);
   const [skipGoogleSearch, setSkipGoogleSearch] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [currentUpload, setCurrentUpload] = useState<{
+    name: string;
+    index: number;
+    total: number;
+  } | null>(null);
+  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
 
   // Mapping (union of keys across all files) + history
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -998,12 +1042,15 @@ function UploadCard({
   const doUploadAll = async () => {
     if (!canUpload) return;
     setBusy(true);
+     const entries = files.slice();
+     const totalFiles = entries.length;
     try {
       const hist = loadHistory();
       const mergedHistory = { ...hist, ...mapping };
       saveHistory(mergedHistory);
 
-      for (const entry of files) {
+      for (let idx = 0; idx < entries.length; idx++) {
+        const entry = entries[idx];
         const fd = new FormData();
         const name = entry.taskName.trim() || entry.file.name.replace(/\.[^.]+$/, '');
         fd.set('name', name);
@@ -1018,8 +1065,18 @@ function UploadCard({
         if (queueMode === 'priority') fd.set('priority', String(priority));
         if (queueMode === 'top') fd.set('priority', String(1));
 
+        setCurrentUpload({ name, index: idx + 1, total: totalFiles });
+        setUploadPercent(0);
+        pushToast({ type: 'info', title: 'Uploading file', detail: name });
+
         try {
-          const result = await api.upload(fd);
+          const result = await api.upload(fd, {
+            onProgress: ({ percent }) => {
+              setUploadPercent(
+                percent === null ? null : Math.min(100, Math.max(0, Math.round(percent * 100)))
+              );
+            },
+          });
           onUploaded({
             job_id: result?.job_id,
             insertWhere: queueMode === 'top' ? { mode: 'top' } : { mode: 'priority', priority },
@@ -1045,6 +1102,8 @@ function UploadCard({
       setQueueMode('priority');
       setPriority(5);
     } finally {
+      setCurrentUpload(null);
+      setUploadPercent(null);
       setBusy(false);
     }
   };
@@ -1275,7 +1334,10 @@ function UploadCard({
           <h3 className="text-md font-semibold mb-2">Selected Files</h3>
           <div className="border rounded-lg overflow-x-auto">
             <table className="w-full table min-w-[860px]">
-              <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+              <thead
+                className="sticky z-10 bg-white dark:bg-slate-900"
+                style={{ top: stickyOffset }}
+              >
                 <tr>
                   <th className="w-[28ch]">Job name</th>
                   <th className="w-[28ch]">Filename</th>
@@ -1352,7 +1414,10 @@ function UploadCard({
             <div className="overflow-x-auto">
               <div className="max-h=[60vh] md:max-h-[420px] overflow-y-auto">
                 <table className="w-full table min-w-[720px]">
-                  <thead className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+                  <thead
+                    className="sticky z-10 bg-white dark:bg-slate-900"
+                    style={{ top: stickyOffset }}
+                  >
                     <tr>
                       <th className="w-1/2">Key</th>
                       <th className="w-1/2">Mapped name</th>
@@ -1381,6 +1446,34 @@ function UploadCard({
           </div>
           <div className="text-xs text-slate-500 mt-1">
             Header is sticky; scroll to see all keys.
+          </div>
+        </div>
+      )}
+
+      {currentUpload && (
+        <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+          <div className="flex items-center justify-between text-sm font-medium">
+            <span>Uploading {currentUpload.name}</span>
+            <span className="text-xs text-slate-500">
+              {currentUpload.index}/{currentUpload.total}
+            </span>
+          </div>
+          <div className="mt-2 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+            <div
+              className={clsx(
+                'h-full rounded-full bg-brand-600 transition-all duration-200',
+                uploadPercent === null && 'animate-pulse'
+              )}
+              style={{
+                width:
+                  uploadPercent === null
+                    ? '35%'
+                    : `${Math.min(100, Math.max(0, uploadPercent))}%`,
+              }}
+            />
+          </div>
+          <div className="text-xs text-slate-500 mt-1">
+            {uploadPercent === null ? 'Calculating upload size...' : `${uploadPercent}%`}
           </div>
         </div>
       )}

@@ -123,6 +123,18 @@ type RawJobStatsResponse = {
   summary: RawJobStatsSummary;
   table_error?: string | null;
 };
+
+export type UploadProgress = {
+  loaded: number;
+  total: number | null;
+  percent: number | null;
+};
+
+type UploadOptions = {
+  signal?: AbortSignal;
+  onProgress?: (progress: UploadProgress) => void;
+};
+
 const json = async <T = any>(res: Response): Promise<T> => {
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
@@ -242,8 +254,74 @@ export const api = {
       tableError: res.table_error ?? null,
     };
   },
-  async upload(fd: FormData) {
-    return json(await fetch('/api/upload', { method: 'POST', body: fd }));
+  async upload(fd: FormData, opts?: UploadOptions) {
+    if (!opts?.onProgress) {
+      return json(
+        await fetch('/api/upload', { method: 'POST', body: fd, signal: opts?.signal })
+      );
+    }
+
+    return new Promise<any>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      let aborted = false;
+      let abortListener: (() => void) | null = null;
+      const cleanup = () => {
+        if (opts?.signal && abortListener) {
+          opts.signal.removeEventListener('abort', abortListener);
+        }
+      };
+      xhr.upload.onprogress = (event) => {
+        opts.onProgress?.({
+          loaded: event.loaded,
+          total: event.lengthComputable ? event.total : null,
+          percent:
+            event.lengthComputable && event.total > 0
+              ? Math.min(1, Math.max(0, event.loaded / event.total))
+              : null,
+        });
+      };
+      xhr.onerror = () => {
+        cleanup();
+        if (aborted) return;
+        reject(new Error('Network error during upload'));
+      };
+      xhr.onabort = () => {
+        cleanup();
+        reject(new Error('Upload aborted'));
+      };
+      xhr.onload = () => {
+        cleanup();
+        if (aborted) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const text = xhr.responseText ?? '';
+            resolve(JSON.parse(text));
+          } catch (err) {
+            reject(err);
+          }
+        } else {
+          const message = xhr.responseText || `${xhr.status} ${xhr.statusText}`;
+          reject(new Error(message));
+        }
+      };
+
+      if (opts?.signal) {
+        if (opts.signal.aborted) {
+          aborted = true;
+          cleanup();
+          reject(new Error('Upload aborted'));
+          return;
+        }
+        abortListener = () => {
+          aborted = true;
+          xhr.abort();
+        };
+        opts.signal.addEventListener('abort', abortListener);
+      }
+
+      xhr.send(fd);
+    });
   },
 
   async updateMapping(jobId: string, mapping: Record<string, string>) {
