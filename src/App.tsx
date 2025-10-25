@@ -59,7 +59,7 @@ const LS_HIDE_COMPLETED = 'hideCompletedJobs';
 const LS_MAP_HISTORY = 'mapping_history_v1';
 const LS_PAGE_SIZE = 'jobsPageSize';
 
-const MAX_TASKS_PER_FILE = 40_000;
+const MAX_TASKS_PER_FILE = 100_000;
 const DISALLOWED_DOMAIN_SUBSTRING = 'epaa.360pi.com';
 
 type SortKey = 'manual' | 'name' | 'created_at' | 'status' | 'priority';
@@ -865,10 +865,7 @@ function UploadCard({
       for (const o of lines) {
         lineNum++;
         const ref = o?.referenceProduct?.referenceAttributes;
-        const domainCandidates = [
-          o?.targetMerchant?.targetHomepage,
-          o?.targetMerchant?.targetName,
-        ]
+        const domainCandidates = [o?.targetMerchant?.targetHomepage, o?.targetMerchant?.targetName]
           .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
           .map((d) => d.trim());
         const primaryDomain = domainCandidates[0] || '';
