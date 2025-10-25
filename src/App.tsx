@@ -1,12 +1,5 @@
 // src/App.tsx
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './lib/api';
@@ -68,7 +61,6 @@ const LS_PAGE_SIZE = 'jobsPageSize';
 
 const MAX_TASKS_PER_FILE = 100_000;
 const DISALLOWED_DOMAIN_SUBSTRING = 'epaa.360pi.com';
-const DEFAULT_HEADER_HEIGHT = 64;
 
 type SortKey = 'manual' | 'name' | 'created_at' | 'status' | 'priority';
 type SortDir = 'asc' | 'desc';
@@ -326,30 +318,6 @@ export default function App() {
   const [hideCompleted, setHideCompleted] = useState(false);
   // Free search (not persisted)
   const [q, setQ] = useState('');
-  const headerRef = useRef<HTMLDivElement | null>(null);
-  const [headerHeight, setHeaderHeight] = useState(DEFAULT_HEADER_HEIGHT);
-
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return;
-    const el = headerRef.current;
-    if (!el) return;
-    const update = () => {
-      setHeaderHeight(el.getBoundingClientRect().height);
-    };
-    update();
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => update());
-      observer.observe(el);
-    }
-    window.addEventListener('resize', update);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', update);
-    };
-  }, []);
-
-  const stickyOffset = headerHeight + 8;
 
   useEffect(() => {
     try {
@@ -416,10 +384,7 @@ export default function App() {
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((t) => t.filter((x) => x.id !== id))} />
 
       {/* Top bar */}
-      <div
-        ref={headerRef}
-        className="sticky top-0 z-20 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800"
-      >
+      <div className="sticky top-0 z-20 backdrop-blur bg-white/70 dark:bg-slate-950/70 border-b border-slate-200/60 dark:border-slate-800">
         <div className="container relative flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <img src="/favicon.svg" className="h-6 w-6" />
@@ -445,7 +410,6 @@ export default function App() {
 
       <div className="container py-6 space-y-6">
         <UploadCard
-          stickyOffset={stickyOffset}
           existingNames={useMemo(
             () => new Set(jobs.map((j) => j.name.trim().toLowerCase())),
             [jobs]
@@ -770,13 +734,11 @@ function ModelStatsModal({ open, onClose }: { open: boolean; onClose: () => void
 // --- REPLACE JUST THE UploadCard COMPONENT BELOW IN YOUR FILE ---
 
 function UploadCard({
-  stickyOffset,
   onUploaded,
   existingNames,
   pushToast,
   onOpenModelStats,
 }: {
-  stickyOffset: number;
   onUploaded: (r: { job_id?: string; insertWhere?: InsertWhere }) => void;
   existingNames: Set<string>;
   pushToast: (t: Omit<Toast, 'id'>) => void;
@@ -1334,10 +1296,7 @@ function UploadCard({
           <h3 className="text-md font-semibold mb-2">Selected Files</h3>
           <div className="border rounded-lg overflow-x-auto">
             <table className="w-full table min-w-[860px]">
-              <thead
-                className="sticky z-10 bg-white dark:bg-slate-900"
-                style={{ top: stickyOffset }}
-              >
+              <thead className="bg-white dark:bg-slate-900">
                 <tr>
                   <th className="w-[28ch]">Job name</th>
                   <th className="w-[28ch]">Filename</th>
@@ -1414,10 +1373,7 @@ function UploadCard({
             <div className="overflow-x-auto">
               <div className="max-h=[60vh] md:max-h-[420px] overflow-y-auto">
                 <table className="w-full table min-w-[720px]">
-                  <thead
-                    className="sticky z-10 bg-white dark:bg-slate-900"
-                    style={{ top: stickyOffset }}
-                  >
+                  <thead className="bg-white dark:bg-slate-900">
                     <tr>
                       <th className="w-1/2">Key</th>
                       <th className="w-1/2">Mapped name</th>
@@ -1444,9 +1400,7 @@ function UploadCard({
               </div>
             </div>
           </div>
-          <div className="text-xs text-slate-500 mt-1">
-            Header is sticky; scroll to see all keys.
-          </div>
+          <div className="text-xs text-slate-500 mt-1">Scroll to see all keys.</div>
         </div>
       )}
 
