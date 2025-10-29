@@ -1004,8 +1004,8 @@ function UploadCard({
   const doUploadAll = async () => {
     if (!canUpload) return;
     setBusy(true);
-     const entries = files.slice();
-     const totalFiles = entries.length;
+    const entries = files.slice();
+    const totalFiles = entries.length;
     try {
       const hist = loadHistory();
       const mergedHistory = { ...hist, ...mapping };
@@ -1420,9 +1420,7 @@ function UploadCard({
               )}
               style={{
                 width:
-                  uploadPercent === null
-                    ? '35%'
-                    : `${Math.min(100, Math.max(0, uploadPercent))}%`,
+                  uploadPercent === null ? '35%' : `${Math.min(100, Math.max(0, uploadPercent))}%`,
               }}
             />
           </div>
