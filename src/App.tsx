@@ -2697,8 +2697,6 @@ function StatsModal({
     }
   }, [selectionError, selectedCount]);
 
-  if (!open) return null;
-
   const displayName = stats?.jobName || jobName;
   const summary = stats?.summary;
   const tableError = stats?.tableError;
@@ -2790,302 +2788,311 @@ function StatsModal({
   const selectDisabled = !hasDomains || jiraSubmitting;
   const confirmDisabled = !selectedCount || jiraSubmitting;
 
-    return (
+  if (!open) return null;
+
+  return (
     <>
       {createPortal(
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-[min(1040px,96vw)] max-h-[85vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
-          <div>
-            <div className="text-lg font-semibold">Job stats</div>
-            <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
-              {displayName || 'Unnamed job'}
-            </div>
-          </div>
-          <button
-            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
-            onClick={onClose}
-            aria-label="Close stats"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="px-5 py-4 max-h-[calc(85vh-72px)] overflow-auto">
-          {loading ? (
-            <div className="py-10 text-center text-sm text-slate-500">Loading stats...</div>
-          ) : error ? (
-            <div className="space-y-4">
-              <div className="rounded-md border border-amber-300 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-                {error}
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+          <div className="relative z-10 w-[min(1040px,96vw)] max-h-[85vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
+            <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
+              <div>
+                <div className="text-lg font-semibold">Job stats</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                  {displayName || 'Unnamed job'}
+                </div>
               </div>
-              <div className="flex justify-end">
-                <button className="btn" onClick={onRetry}>
-                  Retry
-                </button>
-              </div>
+              <button
+                className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={onClose}
+                aria-label="Close stats"
+              >
+                <X size={16} />
+              </button>
             </div>
-          ) : !hasStats ? (
-            <div className="py-10 text-center text-sm text-slate-500">No stats available yet.</div>
-          ) : (
-            <div className="space-y-6">
-              {tableError ? (
-                <div className="rounded-md border border-amber-300 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
-                  {tableError}
-                </div>
-              ) : hasDomains ? (
-                <div className="space-y-3">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
-                    <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200">
-                      <tr>
-                        {selectingDomains && (
-                          <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700 w-12">
-                            Select
-                          </th>
-                        )}
-                        <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700">
-                          Domain
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Catalog
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Matched
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Unmatched
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Sampled
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Processed
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Found
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          DQ MR %
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Potential Matches
-                        </th>
-                        <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Completeness %
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {domains.map((row) => {
-                        const domainName = typeof row.domain === 'string' ? row.domain.trim() : '';
-                        const isSelected = domainName ? selectedDomains.has(domainName) : false;
-                        const rowClasses = clsx(
-                          'border-b border-slate-200 dark:border-slate-700 last:border-b-0',
-                          selectingDomains && 'cursor-pointer',
-                          selectingDomains && isSelected && 'bg-slate-100 dark:bg-slate-800/60'
-                        );
-                        const completenessClasses = clsx(
-                          'inline-flex items-center rounded px-2 py-1 text-xs font-semibold',
-                          row.completeness >= 0.92
-                            ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
-                            : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100'
-                        );
 
-                        return (
-                          <tr
-                            key={row.domain}
-                            className={rowClasses}
-                            onClick={
-                              selectingDomains && domainName
-                                ? () => toggleDomain(domainName)
-                                : undefined
-                            }
-                          >
-                            {selectingDomains && (
-                              <td
-                                className="px-3 py-2 align-top"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4"
-                                  checked={isSelected}
-                                  onChange={() => toggleDomain(domainName)}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </td>
-                            )}
-                            <td className="px-3 py-2 align-top font-medium">
-                              {domainName || 'N/A'}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.catalog)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.matched)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.unmatched)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.sampled)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.processed)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.found)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatPercent(row.dqMr)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatInt(row.potentialMatches)}
-                            </td>
-                            <td className="px-3 py-2 align-top text-right">
-                              <span className={completenessClasses}>
-                                {formatPercent(row.completeness)}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    className={clsx(
-                      'btn',
-                      'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800',
-                      selectDisabled && 'opacity-50 cursor-not-allowed'
-                    )}
-                    onClick={beginSelecting}
-                    disabled={selectDisabled}
-                  >
-                    Select domains for Jira tickets
-                  </button>
-                  {selectingDomains && (
-                    <>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">
-                        {selectedCount} selected
-                      </span>
-                      <button
-                        className={clsx(
-                          'btn',
-                          confirmDisabled
-                            ? 'opacity-50 cursor-not-allowed'
-                            : 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
-                        )}
-                        onClick={handleConfirmDomains}
-                        disabled={confirmDisabled}
-                      >
-                        Confirm Domains
-                      </button>
-                      <button
-                        className={clsx(
-                          'btn',
-                          'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800',
-                          jiraSubmitting && 'opacity-50 cursor-not-allowed'
-                        )}
-                        onClick={cancelSelection}
-                        disabled={jiraSubmitting}
-                      >
-                        Cancel selection
-                      </button>
-                    </>
-                  )}
-                </div>
-                {selectionError && !showCustomerPrompt && (
-                  <div className="text-xs text-rose-600 dark:text-rose-400 text-right">
-                    {selectionError}
+            <div className="px-5 py-4 max-h-[calc(85vh-72px)] overflow-auto">
+              {loading ? (
+                <div className="py-10 text-center text-sm text-slate-500">Loading stats...</div>
+              ) : error ? (
+                <div className="space-y-4">
+                  <div className="rounded-md border border-amber-300 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                    {error}
                   </div>
-                )}
-              </div>
-              ) : (
+                  <div className="flex justify-end">
+                    <button className="btn" onClick={onRetry}>
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              ) : !hasStats ? (
                 <div className="py-10 text-center text-sm text-slate-500">
                   No stats available yet.
                 </div>
-              )}
+              ) : (
+                <div className="space-y-6">
+                  {tableError ? (
+                    <div className="rounded-md border border-amber-300 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+                      {tableError}
+                    </div>
+                  ) : hasDomains ? (
+                    <div className="space-y-3">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
+                          <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200">
+                            <tr>
+                              {selectingDomains && (
+                                <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700 w-12">
+                                  Select
+                                </th>
+                              )}
+                              <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700">
+                                Domain
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Catalog
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Matched
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Unmatched
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Sampled
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Processed
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Found
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                DQ MR %
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Potential Matches
+                              </th>
+                              <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
+                                Completeness %
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {domains.map((row) => {
+                              const domainName =
+                                typeof row.domain === 'string' ? row.domain.trim() : '';
+                              const isSelected = domainName
+                                ? selectedDomains.has(domainName)
+                                : false;
+                              const rowClasses = clsx(
+                                'border-b border-slate-200 dark:border-slate-700 last:border-b-0',
+                                selectingDomains && 'cursor-pointer',
+                                selectingDomains &&
+                                  isSelected &&
+                                  'bg-slate-100 dark:bg-slate-800/60'
+                              );
+                              const completenessClasses = clsx(
+                                'inline-flex items-center rounded px-2 py-1 text-xs font-semibold',
+                                row.completeness >= 0.92
+                                  ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
+                                  : 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100'
+                              );
 
-              {summary && (
-                <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                  <div className="text-sm font-semibold mb-3">Job totals</div>
-                  <dl className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Created
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatDateTime(summary.createdAt)}
-                      </dd>
+                              return (
+                                <tr
+                                  key={row.domain}
+                                  className={rowClasses}
+                                  onClick={
+                                    selectingDomains && domainName
+                                      ? () => toggleDomain(domainName)
+                                      : undefined
+                                  }
+                                >
+                                  {selectingDomains && (
+                                    <td
+                                      className="px-3 py-2 align-top"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={isSelected}
+                                        onChange={() => toggleDomain(domainName)}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </td>
+                                  )}
+                                  <td className="px-3 py-2 align-top font-medium">
+                                    {domainName || 'N/A'}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.catalog)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.matched)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.unmatched)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.sampled)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.processed)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.found)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatPercent(row.dqMr)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    {formatInt(row.potentialMatches)}
+                                  </td>
+                                  <td className="px-3 py-2 align-top text-right">
+                                    <span className={completenessClasses}>
+                                      {formatPercent(row.completeness)}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          className={clsx(
+                            'btn',
+                            'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800',
+                            selectDisabled && 'opacity-50 cursor-not-allowed'
+                          )}
+                          onClick={beginSelecting}
+                          disabled={selectDisabled}
+                        >
+                          Select domains for Jira tickets
+                        </button>
+                        {selectingDomains && (
+                          <>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">
+                              {selectedCount} selected
+                            </span>
+                            <button
+                              className={clsx(
+                                'btn',
+                                confirmDisabled
+                                  ? 'opacity-50 cursor-not-allowed'
+                                  : 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
+                              )}
+                              onClick={handleConfirmDomains}
+                              disabled={confirmDisabled}
+                            >
+                              Confirm Domains
+                            </button>
+                            <button
+                              className={clsx(
+                                'btn',
+                                'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800',
+                                jiraSubmitting && 'opacity-50 cursor-not-allowed'
+                              )}
+                              onClick={cancelSelection}
+                              disabled={jiraSubmitting}
+                            >
+                              Cancel selection
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      {selectionError && !showCustomerPrompt && (
+                        <div className="text-xs text-rose-600 dark:text-rose-400 text-right">
+                          {selectionError}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Started
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatDateTime(summary.startedAt)}
-                      </dd>
+                  ) : (
+                    <div className="py-10 text-center text-sm text-slate-500">
+                      No stats available yet.
                     </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Finished
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatDateTime(summary.finishedAt)}
-                      </dd>
+                  )}
+
+                  {summary && (
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                      <div className="text-sm font-semibold mb-3">Job totals</div>
+                      <dl className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Created
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatDateTime(summary.createdAt)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Started
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatDateTime(summary.startedAt)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Finished
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatDateTime(summary.finishedAt)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Total time
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatDuration(summary.totalDurationSeconds)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Total cost
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatCost(summary.totalCost)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Total Gemini requests
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatInt(summary.totalGeminiRequests)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Found via Google
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatInt(summary.foundViaGoogle)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Found via Polaris
+                          </dt>
+                          <dd className="text-sm text-slate-900 dark:text-slate-100">
+                            {formatInt(summary.foundViaPolaris)}
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Total time
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatDuration(summary.totalDurationSeconds)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Total cost
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatCost(summary.totalCost)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Total Gemini requests
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatInt(summary.totalGeminiRequests)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Found via Google
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatInt(summary.foundViaGoogle)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        Found via Polaris
-                      </dt>
-                      <dd className="text-sm text-slate-900 dark:text-slate-100">
-                        {formatInt(summary.foundViaPolaris)}
-                      </dd>
-                    </div>
-                  </dl>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
-    </div>,
+          </div>
+        </div>,
         document.body
       )}
       {showCustomerPrompt &&
@@ -3149,7 +3156,6 @@ function StatsModal({
         )}
     </>
   );
-
 }
 /* ------------------------------ RowActions ------------------------------ */
 
