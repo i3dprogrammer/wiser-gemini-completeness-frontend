@@ -61,56 +61,123 @@ const LS_PAGE_SIZE = 'jobsPageSize';
 
 const MAX_TASKS_PER_FILE = 100_000;
 const DISALLOWED_DOMAIN_SUBSTRING = 'epaa.360pi.com';
+const OPS_RECENT_DQ_TICKETS_URL =
+  'https://wisersolutions.atlassian.net/jira/software/c/projects/OPS/issues/?jql=project%20%3D%20%22OPS%22%20AND%20type%20%3D%20%22Data%20Quality%20Task%22%20AND%20created%20%3E%3D%20-15m%20ORDER%20BY%20created%20DESC';
 
 type SortKey = 'manual' | 'name' | 'created_at' | 'status' | 'priority';
 type SortDir = 'asc' | 'desc';
 
 /* ---------------------------- Toasts (simple) ---------------------------- */
 
-type Toast = { id: string; type: 'success' | 'error' | 'info'; title: string; detail?: string };
+type ToastPlacement = 'top-right' | 'bottom-left';
+type ToastAction = {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+};
+type Toast = {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  title: string;
+  detail?: string;
+  placement?: ToastPlacement;
+  durationMs?: number;
+  action?: ToastAction;
+};
 const Toasts: React.FC<{ toasts: Toast[]; onDismiss: (id: string) => void }> = ({
   toasts,
   onDismiss,
-}) => (
-  <div className="fixed top-3 right-3 z-50 space-y-2">
-    {toasts.map((t) => (
-      <div
-        key={t.id}
-        className={clsx(
-          'min-w-[260px] max-w-[420px] rounded-lg border shadow-soft px-3 py-2 text-sm',
-          t.type === 'success' &&
-            'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-100',
-          t.type === 'error' &&
-            'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-100',
-          t.type === 'info' &&
-            'bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-100'
-        )}
-      >
-        <div className="flex items-start gap-2">
-          <div className="mt-0.5">
-            {t.type === 'success' ? (
-              <Check size={16} />
-            ) : t.type === 'error' ? (
-              <X size={16} />
-            ) : (
-              <Info size={16} />
+}) => {
+  const placementClasses: Record<ToastPlacement, string> = {
+    'top-right': 'top-3 right-3 space-y-2',
+    'bottom-left': 'bottom-3 left-3 space-y-2',
+  };
+  const grouped = toasts.reduce<Record<ToastPlacement, Toast[]>>((acc, toast) => {
+    const placement = toast.placement ?? 'top-right';
+    if (!acc[placement]) acc[placement] = [];
+    acc[placement].push(toast);
+    return acc;
+  }, {} as Record<ToastPlacement, Toast[]>);
+
+  const handleActionClick = (toast: Toast) => {
+    const action = toast.action;
+    if (!action) return;
+    if (action.href) {
+      try {
+        window.open(action.href, '_blank', 'noopener');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    action.onClick?.();
+    onDismiss(toast.id);
+  };
+
+  return (
+    <>
+      {(Object.keys(grouped) as ToastPlacement[]).map((placement) => {
+        const list = grouped[placement];
+        if (!list?.length) return null;
+        return (
+          <div
+            key={placement}
+            className={clsx(
+              'fixed z-50',
+              placementClasses[placement] ?? placementClasses['top-right']
             )}
-          </div>
-          <div className="flex-1">
-            <div className="font-medium">{t.title}</div>
-            {!!t.detail && <div className="text-xs opacity-80 whitespace-pre-wrap">{t.detail}</div>}
-          </div>
-          <button
-            className="text-xs underline opacity-70 hover:opacity-100"
-            onClick={() => onDismiss(t.id)}
           >
-            Dismiss
-          </button>
-        </div>
-      </div>
-    ))}
-  </div>
-);
+            {list.map((t) => (
+              <div
+                key={t.id}
+                className={clsx(
+                  'min-w-[260px] max-w-[420px] rounded-lg border shadow-soft px-3 py-2 text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur',
+                  t.type === 'success' &&
+                    'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-100',
+                  t.type === 'error' &&
+                    'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-100',
+                  t.type === 'info' &&
+                    'bg-slate-50 border-slate-200 text-slate-900 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-100'
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="mt-0.5">
+                    {t.type === 'success' ? (
+                      <Check size={16} />
+                    ) : t.type === 'error' ? (
+                      <X size={16} />
+                    ) : (
+                      <Info size={16} />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">{t.title}</div>
+                    {!!t.detail && (
+                      <div className="text-xs opacity-80 whitespace-pre-wrap">{t.detail}</div>
+                    )}
+                    {t.action && (
+                      <button
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:text-brand-800 underline decoration-dotted"
+                        onClick={() => handleActionClick(t)}
+                      >
+                        {t.action.label}
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    className="text-xs underline opacity-70 hover:opacity-100"
+                    onClick={() => onDismiss(t.id)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+};
 
 /* ----------------------------- Confirm Modal ----------------------------- */
 
@@ -359,7 +426,8 @@ export default function App() {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const toast: Toast = { id, ...t };
     setToasts((prev) => [...prev, toast]);
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500);
+    const duration = Number.isFinite(t.durationMs) ? Math.max(1000, Number(t.durationMs)) : 4500;
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), duration);
   };
 
   const announcementMessage = quotaAnnouncement?.message ?? null;
@@ -2770,6 +2838,17 @@ function StatsModal({
         type: 'success',
         title: 'Jira tickets requested',
         detail: `${selectedCount} domain${selectedCount === 1 ? '' : 's'} queued`,
+      });
+      pushToast({
+        type: 'info',
+        title: 'View recent Jira tickets',
+        detail: 'Opens OPS tickets created in the last 15 minutes.',
+        placement: 'bottom-left',
+        durationMs: 15000,
+        action: {
+          label: 'Open Jira',
+          href: OPS_RECENT_DQ_TICKETS_URL,
+        },
       });
       resetJiraFlow();
     } catch (err: any) {
