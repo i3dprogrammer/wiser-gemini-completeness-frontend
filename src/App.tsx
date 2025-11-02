@@ -2597,12 +2597,6 @@ function StatsModal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
-
-  const displayName = stats?.jobName || jobName;
-  const summary = stats?.summary;
-  const tableError = stats?.tableError;
-
   const formatInt = (value: number) => (Number.isFinite(value) ? value.toLocaleString() : '-');
   const formatPercent = (value: number) =>
     Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : '-';
@@ -2702,6 +2696,12 @@ function StatsModal({
       setSelectionError(null);
     }
   }, [selectionError, selectedCount]);
+
+  if (!open) return null;
+
+  const displayName = stats?.jobName || jobName;
+  const summary = stats?.summary;
+  const tableError = stats?.tableError;
 
   const beginSelecting = React.useCallback(() => {
     if (!hasDomains) return;
