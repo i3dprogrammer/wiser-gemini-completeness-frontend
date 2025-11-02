@@ -2535,12 +2535,14 @@ function QueueTable({
 
       <StatsModal
         open={!!statsJob}
+        jobId={statsJob?.id || jobStats?.jobId || ''}
         jobName={statsJob?.name || ''}
         stats={jobStats}
         loading={statsLoading}
         error={statsError}
         onClose={closeStatsModal}
         onRetry={retryStats}
+        pushToast={pushToast}
       />
       <RenameJobDialog
         open={!!renameTarget}
@@ -2563,15 +2565,27 @@ function QueueTable({
 
 type StatsModalProps = {
   open: boolean;
+  jobId: string;
   jobName: string;
   stats: JobStats | null;
   loading: boolean;
   error: string | null;
   onClose: () => void;
   onRetry: () => void;
+  pushToast: (toast: Omit<Toast, 'id'>) => void;
 };
 
-function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: StatsModalProps) {
+function StatsModal({
+  open,
+  jobId,
+  jobName,
+  stats,
+  loading,
+  error,
+  onClose,
+  onRetry,
+  pushToast,
+}: StatsModalProps) {
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -2624,11 +2638,161 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
       ? `$${value.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`
       : '-';
 
+  const [selectingDomains, setSelectingDomains] = React.useState(false);
+  const [selectedDomains, setSelectedDomains] = React.useState<Set<string>>(() => new Set());
+  const [showCustomerPrompt, setShowCustomerPrompt] = React.useState(false);
+  const [customerNameDraft, setCustomerNameDraft] = React.useState('');
+  const [selectionError, setSelectionError] = React.useState<string | null>(null);
+  const [customerError, setCustomerError] = React.useState<string | null>(null);
+  const [jiraSubmitting, setJiraSubmitting] = React.useState(false);
+
+  const resetJiraFlow = React.useCallback(() => {
+    setSelectingDomains(false);
+    setSelectedDomains(new Set());
+    setShowCustomerPrompt(false);
+    setCustomerNameDraft('');
+    setSelectionError(null);
+    setCustomerError(null);
+    setJiraSubmitting(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) {
+      resetJiraFlow();
+    }
+  }, [open, resetJiraFlow]);
+
   const hasStats = Boolean(stats);
   const domains = stats?.domains ?? [];
   const hasDomains = domains.length > 0;
 
-  return createPortal(
+  const suggestedDomains = React.useMemo(() => {
+    const out: string[] = [];
+    for (const d of domains) {
+      const name = typeof d.domain === 'string' ? d.domain.trim() : '';
+      if (!name) continue;
+      if (typeof d.completeness === 'number' && d.completeness < 0.92) {
+        out.push(name);
+      }
+    }
+    return out;
+  }, [domains]);
+
+  const selectedDomainList = React.useMemo(() => {
+    if (!selectedDomains.size) return [];
+    const ordered: string[] = [];
+    const added = new Set<string>();
+    for (const d of domains) {
+      const name = typeof d.domain === 'string' ? d.domain.trim() : '';
+      if (name && selectedDomains.has(name)) {
+        ordered.push(name);
+        added.add(name);
+      }
+    }
+    for (const name of selectedDomains) {
+      if (!added.has(name)) ordered.push(name);
+    }
+    return ordered;
+  }, [selectedDomains, domains]);
+
+  const selectedCount = selectedDomainList.length;
+
+  React.useEffect(() => {
+    if (selectionError && selectedCount > 0) {
+      setSelectionError(null);
+    }
+  }, [selectionError, selectedCount]);
+
+  const beginSelecting = React.useCallback(() => {
+    if (!hasDomains) return;
+    setSelectingDomains(true);
+    setShowCustomerPrompt(false);
+    setCustomerNameDraft('');
+    setSelectionError(null);
+    setCustomerError(null);
+    setJiraSubmitting(false);
+    setSelectedDomains(() => new Set(suggestedDomains));
+  }, [hasDomains, suggestedDomains]);
+
+  const toggleDomain = React.useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSelectedDomains((prev) => {
+      const next = new Set(prev);
+      if (next.has(trimmed)) {
+        next.delete(trimmed);
+      } else {
+        next.add(trimmed);
+      }
+      return next;
+    });
+    setSelectionError(null);
+  }, []);
+
+  const handleConfirmDomains = React.useCallback(() => {
+    if (!selectingDomains) return;
+    if (!selectedCount) {
+      setSelectionError('Select at least one domain.');
+      return;
+    }
+    setCustomerNameDraft('');
+    setCustomerError(null);
+    setShowCustomerPrompt(true);
+  }, [selectingDomains, selectedCount]);
+
+  const cancelSelection = React.useCallback(() => {
+    if (jiraSubmitting) return;
+    resetJiraFlow();
+  }, [jiraSubmitting, resetJiraFlow]);
+
+  const closeCustomerPrompt = React.useCallback(() => {
+    if (jiraSubmitting) return;
+    setShowCustomerPrompt(false);
+    setCustomerError(null);
+  }, [jiraSubmitting]);
+
+  const submitJira = React.useCallback(async () => {
+    const trimmed = customerNameDraft.trim();
+    if (!trimmed) {
+      setCustomerError('Customer name is required.');
+      return;
+    }
+    if (!jobId) {
+      setCustomerError('Job id is unavailable.');
+      return;
+    }
+    if (!selectedCount) {
+      setCustomerError('Select at least one domain.');
+      return;
+    }
+    try {
+      setJiraSubmitting(true);
+      await api.createJiraTickets(jobId, trimmed, selectedDomainList);
+      pushToast({
+        type: 'success',
+        title: 'Jira tickets requested',
+        detail: `${selectedCount} domain${selectedCount === 1 ? '' : 's'} queued`,
+      });
+      resetJiraFlow();
+    } catch (err: any) {
+      const message = String(err?.message || err);
+      pushToast({
+        type: 'error',
+        title: 'Failed to create Jira tickets',
+        detail: message,
+      });
+      setCustomerError(message);
+    } finally {
+      setJiraSubmitting(false);
+    }
+  }, [customerNameDraft, jobId, selectedCount, selectedDomainList, pushToast, resetJiraFlow]);
+
+  const selectDisabled = !hasDomains || jiraSubmitting;
+  const confirmDisabled = !selectedCount || jiraSubmitting;
+
+    return (
+    <>
+      {createPortal(
     <div className="fixed inset-0 z-[1100] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative z-10 w-[min(1040px,96vw)] max-h-[85vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
@@ -2671,10 +2835,16 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                   {tableError}
                 </div>
               ) : hasDomains ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm border border-slate-200 dark:border-slate-700">
                     <thead className="bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200">
                       <tr>
+                        {selectingDomains && (
+                          <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700 w-12">
+                            Select
+                          </th>
+                        )}
                         <th className="px-3 py-2 text-left font-medium border-b border-slate-200 dark:border-slate-700">
                           Domain
                         </th>
@@ -2700,7 +2870,7 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                           DQ MR %
                         </th>
                         <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
-                          Potential matches
+                          Potential Matches
                         </th>
                         <th className="px-3 py-2 text-right font-medium border-b border-slate-200 dark:border-slate-700">
                           Completeness %
@@ -2709,6 +2879,13 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                     </thead>
                     <tbody>
                       {domains.map((row) => {
+                        const domainName = typeof row.domain === 'string' ? row.domain.trim() : '';
+                        const isSelected = domainName ? selectedDomains.has(domainName) : false;
+                        const rowClasses = clsx(
+                          'border-b border-slate-200 dark:border-slate-700 last:border-b-0',
+                          selectingDomains && 'cursor-pointer',
+                          selectingDomains && isSelected && 'bg-slate-100 dark:bg-slate-800/60'
+                        );
                         const completenessClasses = clsx(
                           'inline-flex items-center rounded px-2 py-1 text-xs font-semibold',
                           row.completeness >= 0.92
@@ -2719,10 +2896,29 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                         return (
                           <tr
                             key={row.domain}
-                            className="border-b border-slate-200 dark:border-slate-700 last:border-b-0"
+                            className={rowClasses}
+                            onClick={
+                              selectingDomains && domainName
+                                ? () => toggleDomain(domainName)
+                                : undefined
+                            }
                           >
+                            {selectingDomains && (
+                              <td
+                                className="px-3 py-2 align-top"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={isSelected}
+                                  onChange={() => toggleDomain(domainName)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </td>
+                            )}
                             <td className="px-3 py-2 align-top font-medium">
-                              {row.domain || 'N/A'}
+                              {domainName || 'N/A'}
                             </td>
                             <td className="px-3 py-2 align-top text-right">
                               {formatInt(row.catalog)}
@@ -2759,6 +2955,55 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
                     </tbody>
                   </table>
                 </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    className={clsx(
+                      'btn',
+                      'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800',
+                      selectDisabled && 'opacity-50 cursor-not-allowed'
+                    )}
+                    onClick={beginSelecting}
+                    disabled={selectDisabled}
+                  >
+                    Select domains for Jira tickets
+                  </button>
+                  {selectingDomains && (
+                    <>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 mr-1">
+                        {selectedCount} selected
+                      </span>
+                      <button
+                        className={clsx(
+                          'btn',
+                          confirmDisabled
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
+                        )}
+                        onClick={handleConfirmDomains}
+                        disabled={confirmDisabled}
+                      >
+                        Confirm Domains
+                      </button>
+                      <button
+                        className={clsx(
+                          'btn',
+                          'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800',
+                          jiraSubmitting && 'opacity-50 cursor-not-allowed'
+                        )}
+                        onClick={cancelSelection}
+                        disabled={jiraSubmitting}
+                      >
+                        Cancel selection
+                      </button>
+                    </>
+                  )}
+                </div>
+                {selectionError && !showCustomerPrompt && (
+                  <div className="text-xs text-rose-600 dark:text-rose-400 text-right">
+                    {selectionError}
+                  </div>
+                )}
+              </div>
               ) : (
                 <div className="py-10 text-center text-sm text-slate-500">
                   No stats available yet.
@@ -2841,8 +3086,70 @@ function StatsModal({ open, jobName, stats, loading, error, onClose, onRetry }: 
         </div>
       </div>
     </div>,
-    document.body
+        document.body
+      )}
+      {showCustomerPrompt &&
+        createPortal(
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center">
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={jiraSubmitting ? undefined : closeCustomerPrompt}
+            />
+            <div className="relative z-10 w-[min(420px,90vw)] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                <div className="text-base font-semibold">Customer name</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Provide the customer for these Jira tickets.
+                </div>
+              </div>
+              <div className="px-4 py-4 space-y-3">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Customer name
+                </label>
+                <input
+                  className="input w-full"
+                  value={customerNameDraft}
+                  onChange={(e) => setCustomerNameDraft(e.target.value)}
+                  disabled={jiraSubmitting}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !jiraSubmitting) {
+                      e.preventDefault();
+                      submitJira();
+                    }
+                  }}
+                />
+                {customerError && (
+                  <div className="text-xs text-rose-600 dark:text-rose-400">{customerError}</div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  className="btn"
+                  onClick={jiraSubmitting ? undefined : closeCustomerPrompt}
+                  disabled={jiraSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={clsx(
+                    'btn',
+                    jiraSubmitting
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'bg-brand-600 text-white border-transparent hover:bg-brand-700'
+                  )}
+                  onClick={jiraSubmitting ? undefined : submitJira}
+                >
+                  {jiraSubmitting ? 'Submitting...' : 'Create tickets'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
+
 }
 /* ------------------------------ RowActions ------------------------------ */
 
