@@ -2706,6 +2706,8 @@ function StatsModal({
   const [customerNameDraft, setCustomerNameDraft] = React.useState('');
   const [selectionError, setSelectionError] = React.useState<string | null>(null);
   const [customerError, setCustomerError] = React.useState<string | null>(null);
+  const [parentKeyDraft, setParentKeyDraft] = React.useState('');
+  const [parentError, setParentError] = React.useState<string | null>(null);
   const [jiraSubmitting, setJiraSubmitting] = React.useState(false);
 
   const resetJiraFlow = React.useCallback(() => {
@@ -2715,7 +2717,14 @@ function StatsModal({
     setCustomerNameDraft('');
     setSelectionError(null);
     setCustomerError(null);
+    setParentKeyDraft('');
+    setParentError(null);
     setJiraSubmitting(false);
+  }, []);
+
+  const extractParentKey = React.useCallback((value: string): string | null => {
+    const match = value.match(/OPS-\d+/i);
+    return match ? match[0].toUpperCase() : null;
   }, []);
 
   React.useEffect(() => {
@@ -2776,6 +2785,8 @@ function StatsModal({
     setCustomerNameDraft('');
     setSelectionError(null);
     setCustomerError(null);
+    setParentKeyDraft('');
+    setParentError(null);
     setJiraSubmitting(false);
     setSelectedDomains(() => new Set(suggestedDomains));
   }, [hasDomains, suggestedDomains]);
@@ -2815,6 +2826,7 @@ function StatsModal({
     if (jiraSubmitting) return;
     setShowCustomerPrompt(false);
     setCustomerError(null);
+    setParentError(null);
   }, [jiraSubmitting]);
 
   const submitJira = React.useCallback(async () => {
@@ -2831,9 +2843,20 @@ function StatsModal({
       setCustomerError('Select at least one domain.');
       return;
     }
+    const parentInput = parentKeyDraft.trim();
+    let parentKey: string | null = null;
+    if (parentInput) {
+      const extracted = extractParentKey(parentInput);
+      if (!extracted) {
+        setParentError('Parent ticket must contain an OPS-123 style key.');
+        return;
+      }
+      parentKey = extracted;
+    }
+    setParentError(null);
     try {
       setJiraSubmitting(true);
-      await api.createJiraTickets(jobId, trimmed, selectedDomainList);
+      await api.createJiraTickets(jobId, trimmed, selectedDomainList, parentKey ?? undefined);
       pushToast({
         type: 'success',
         title: 'Jira tickets requested',
@@ -2862,7 +2885,16 @@ function StatsModal({
     } finally {
       setJiraSubmitting(false);
     }
-  }, [customerNameDraft, jobId, selectedCount, selectedDomainList, pushToast, resetJiraFlow]);
+  }, [
+    customerNameDraft,
+    jobId,
+    selectedCount,
+    selectedDomainList,
+    parentKeyDraft,
+    extractParentKey,
+    pushToast,
+    resetJiraFlow,
+  ]);
 
   const selectDisabled = !hasDomains || jiraSubmitting;
   const confirmDisabled = !selectedCount || jiraSubmitting;
@@ -3188,26 +3220,53 @@ function StatsModal({
                   Provide the customer for these Jira tickets.
                 </div>
               </div>
-              <div className="px-4 py-4 space-y-3">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Customer name
-                </label>
-                <input
-                  className="input w-full"
-                  value={customerNameDraft}
-                  onChange={(e) => setCustomerNameDraft(e.target.value)}
-                  disabled={jiraSubmitting}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !jiraSubmitting) {
-                      e.preventDefault();
-                      submitJira();
-                    }
-                  }}
-                />
-                {customerError && (
-                  <div className="text-xs text-rose-600 dark:text-rose-400">{customerError}</div>
-                )}
+              <div className="px-4 py-4 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Customer name
+                  </label>
+                  <input
+                    className="input w-full"
+                    value={customerNameDraft}
+                    onChange={(e) => setCustomerNameDraft(e.target.value)}
+                    disabled={jiraSubmitting}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !jiraSubmitting) {
+                        e.preventDefault();
+                        submitJira();
+                      }
+                    }}
+                  />
+                  {customerError && (
+                    <div className="text-xs text-rose-600 dark:text-rose-400">{customerError}</div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Parent ticket (optional)
+                  </label>
+                  <input
+                    className="input w-full"
+                    value={parentKeyDraft}
+                    onChange={(e) => setParentKeyDraft(e.target.value)}
+                    disabled={jiraSubmitting}
+                    placeholder="e.g. OPS-123 or https://.../browse/OPS-123"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !jiraSubmitting) {
+                        e.preventDefault();
+                        submitJira();
+                      }
+                    }}
+                  />
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    Provide an OPS ticket key if these issues should roll up under an existing parent.
+                  </div>
+                  {parentError && (
+                    <div className="text-xs text-rose-600 dark:text-rose-400">{parentError}</div>
+                  )}
+                </div>
               </div>
               <div className="flex justify-end gap-2 px-4 py-3 bg-slate-50 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-700">
                 <button

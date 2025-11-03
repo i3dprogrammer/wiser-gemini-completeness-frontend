@@ -254,12 +254,24 @@ export const api = {
       tableError: res.table_error ?? null,
     };
   },
-  async createJiraTickets(jobId: string, customerName: string, domains: string[]) {
+  async createJiraTickets(
+    jobId: string,
+    customerName: string,
+    domains: string[],
+    parentKey?: string
+  ) {
+    const payload: Record<string, unknown> = {
+      customer_name: customerName,
+      domains,
+    };
+    if (parentKey) {
+      payload.parent_key = parentKey;
+    }
     return json(
       await fetch(`/api/job/${jobId}/jira-tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_name: customerName, domains }),
+        body: JSON.stringify(payload),
       })
     );
   },
