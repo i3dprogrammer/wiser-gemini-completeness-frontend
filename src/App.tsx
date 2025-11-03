@@ -2777,6 +2777,16 @@ function StatsModal({
   const displayName = stats?.jobName || jobName;
   const summary = stats?.summary;
   const tableError = stats?.tableError;
+  const enabledFlags = React.useMemo(() => {
+    const flags = stats?.flags;
+    if (!flags) return [];
+    const labels: string[] = [];
+    if (flags.validateImages) labels.push('Validate Images');
+    if (flags.validateGoogleMatchesViaPolaris) labels.push('Validate Google Matches');
+    if (flags.allowMultipleFoundUrls) labels.push('Allow multiple found URLs');
+    if (flags.skipGoogleSearch) labels.push('Skip Google Search');
+    return labels;
+  }, [stats?.flags]);
 
   const beginSelecting = React.useCallback(() => {
     if (!hasDomains) return;
@@ -3125,6 +3135,28 @@ function StatsModal({
                   ) : (
                     <div className="py-10 text-center text-sm text-slate-500">
                       No stats available yet.
+                    </div>
+                  )}
+
+                  {stats?.flags && (
+                    <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                      <div className="text-sm font-semibold mb-3">Job flags</div>
+                      {enabledFlags.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {enabledFlags.map((label) => (
+                            <span
+                              key={label}
+                              className="inline-flex items-center px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-200"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          No optional flags enabled.
+                        </div>
+                      )}
                     </div>
                   )}
 

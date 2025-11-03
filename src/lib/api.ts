@@ -91,10 +91,18 @@ export type JobStatsSummary = {
   foundViaPolaris: number;
 };
 
+export type JobFlags = {
+  validateImages: boolean;
+  validateGoogleMatchesViaPolaris: boolean;
+  allowMultipleFoundUrls: boolean;
+  skipGoogleSearch: boolean;
+};
+
 
 export type JobStats = {
   jobId: string;
   jobName: string;
+  flags: JobFlags;
   domains: JobDomainStat[];
   summary: JobStatsSummary;
   tableError?: string | null;
@@ -116,9 +124,17 @@ type RawJobStatsSummary = {
   found_via_polaris: number;
 };
 
+type RawJobFlags = {
+  validate_images: boolean;
+  validate_google_matches_via_polaris: boolean;
+  allow_multiple_found_urls: boolean;
+  skip_google_search: boolean;
+};
+
 type RawJobStatsResponse = {
   job_id: string;
   job_name: string;
+  flags: RawJobFlags;
   domains: RawJobDomainStat[];
   summary: RawJobStatsSummary;
   table_error?: string | null;
@@ -229,6 +245,12 @@ export const api = {
     return {
       jobId: res.job_id,
       jobName: res.job_name,
+      flags: {
+        validateImages: !!res.flags?.validate_images,
+        validateGoogleMatchesViaPolaris: !!res.flags?.validate_google_matches_via_polaris,
+        allowMultipleFoundUrls: !!res.flags?.allow_multiple_found_urls,
+        skipGoogleSearch: !!res.flags?.skip_google_search,
+      },
       domains: res.domains.map((d) => ({
         domain: d.domain,
         catalog: d.catalog,
