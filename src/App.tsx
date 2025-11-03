@@ -122,7 +122,7 @@ const Toasts: React.FC<{ toasts: Toast[]; onDismiss: (id: string) => void }> = (
           <div
             key={placement}
             className={clsx(
-              'fixed z-50',
+              'fixed z-[2000] pointer-events-none',
               placementClasses[placement] ?? placementClasses['top-right']
             )}
           >
@@ -130,7 +130,7 @@ const Toasts: React.FC<{ toasts: Toast[]; onDismiss: (id: string) => void }> = (
               <div
                 key={t.id}
                 className={clsx(
-                  'min-w-[260px] max-w-[420px] rounded-lg border shadow-soft px-3 py-2 text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur',
+                  'min-w-[260px] max-w-[420px] rounded-lg border shadow-soft px-3 py-2 text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur pointer-events-auto',
                   t.type === 'success' &&
                     'bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-900 dark:text-emerald-100',
                   t.type === 'error' &&
