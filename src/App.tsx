@@ -2787,6 +2787,11 @@ function StatsModal({
     if (flags.skipGoogleSearch) labels.push('Skip Google Search');
     return labels;
   }, [stats?.flags]);
+  const additionalPrompt = React.useMemo(
+    () => (stats?.additionalPrompt ?? '').trim(),
+    [stats?.additionalPrompt]
+  );
+  const hasAdditionalPrompt = additionalPrompt.length > 0;
 
   const beginSelecting = React.useCallback(() => {
     if (!hasDomains) return;
@@ -3138,25 +3143,48 @@ function StatsModal({
                     </div>
                   )}
 
-                  {stats?.flags && (
+                  {(stats?.flags || hasAdditionalPrompt) && (
                     <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                      <div className="text-sm font-semibold mb-3">Job flags</div>
-                      {enabledFlags.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {enabledFlags.map((label) => (
-                            <span
-                              key={label}
-                              className="inline-flex items-center px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-200"
-                            >
-                              {label}
-                            </span>
-                          ))}
+                      <div className="text-sm font-semibold mb-3">Job configuration</div>
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        {stats?.flags && (
+                          <div>
+                            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                              Job flags
+                            </div>
+                            {enabledFlags.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {enabledFlags.map((label) => (
+                                  <span
+                                    key={label}
+                                    className="inline-flex items-center px-2.5 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-200"
+                                  >
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                No optional flags enabled.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Additional prompt
+                          </div>
+                          {hasAdditionalPrompt ? (
+                            <div className="mt-2 max-h-48 overflow-auto rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap">
+                              {additionalPrompt}
+                            </div>
+                          ) : (
+                            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                              No additional prompt provided.
+                            </div>
+                          )}
                         </div>
-                      ) : (
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
-                          No optional flags enabled.
-                        </div>
-                      )}
+                      </div>
                     </div>
                   )}
 

@@ -102,6 +102,7 @@ export type JobFlags = {
 export type JobStats = {
   jobId: string;
   jobName: string;
+  additionalPrompt: string;
   flags: JobFlags;
   domains: JobDomainStat[];
   summary: JobStatsSummary;
@@ -134,6 +135,7 @@ type RawJobFlags = {
 type RawJobStatsResponse = {
   job_id: string;
   job_name: string;
+  additional_prompt?: string | null;
   flags: RawJobFlags;
   domains: RawJobDomainStat[];
   summary: RawJobStatsSummary;
@@ -245,6 +247,7 @@ export const api = {
     return {
       jobId: res.job_id,
       jobName: res.job_name,
+      additionalPrompt: (res.additional_prompt ?? '') || '',
       flags: {
         validateImages: !!res.flags?.validate_images,
         validateGoogleMatchesViaPolaris: !!res.flags?.validate_google_matches_via_polaris,
